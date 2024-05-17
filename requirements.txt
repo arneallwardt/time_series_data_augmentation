@@ -35,7 +35,9 @@ nest-asyncio==1.6.0
 networkx==3.3
 numpy==1.26.4
 packaging==24.0
+pandas==2.2.2
 parso==0.8.4
+pathlib==1.0.1
 pexpect==4.9.0
 pillow==10.3.0
 platformdirs==4.2.1
@@ -49,6 +51,7 @@ Pygments==2.18.0
 pyparsing==3.1.2
 python-dateutil==2.9.0.post0
 pytorch-lightning==2.2.4
+pytz==2024.1
 PyYAML==6.0.1
 pyzmq==26.0.3
 six==1.16.0
@@ -64,6 +67,7 @@ tornado==6.4
 tqdm==4.66.4
 traitlets==5.14.3
 typing_extensions==4.11.0
+tzdata==2024.1
 wcwidth==0.2.13
 Werkzeug==3.0.3
 yarl==1.9.4
