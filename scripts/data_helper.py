@@ -29,7 +29,7 @@ class DataHelper:
         plt.title(title)
         plt.xlabel(x)
         plt.ylabel(y[0])
-        plt.grid(True)
+        plt.grid(False)
         plt.show()
     
     
