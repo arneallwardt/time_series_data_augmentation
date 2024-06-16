@@ -4,8 +4,8 @@ import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from utils import random_generator
-from utils import extract_time
+from utils.utils import random_generator
+from utils.utils import extract_time
 import matplotlib.pyplot as plt
 
 class Time_GAN_module(nn.Module):

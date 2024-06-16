@@ -1,7 +1,9 @@
+import torch
 import numpy as np
-from scipy.spatial.distance import pdist, squareform 
 import matplotlib.pyplot as plt
 import pandas as pd
+from copy import deepcopy as dc
+from scipy.spatial.distance import pdist, squareform 
 
 
 ### DATA VISUALIZATION ###
@@ -87,6 +89,56 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
     df_sliced.reset_index(inplace=True)
 
     return df_sliced
+
+
+
+### DATA PREPROCESSING ###
+
+def add_lagged_data(df: pd.DataFrame, lag, convert_to_numpy=True):
+    '''Returns a numpy array of the dataframe with lagged features'''
+
+    df = dc(df) # make a copy of the dataframe to prevent changes to the original dataframe
+
+    df.set_index('Date', inplace=True) # set Date as index
+
+    # create lagged features
+    for i in range(1, lag + 1):
+        df[f'Close_t-{i}'] = df['Close'].shift(i) # shift the Close column by i steps
+
+    df.dropna(inplace=True)
+
+    if convert_to_numpy:
+        df = df.to_numpy() # convert dataframe to numpy array
+
+    return df
+
+
+def scale_data(np_array, scaler):
+    '''Scales the data using the specified scaler'''
+
+    np_array = scaler.fit_transform(np_array)
+    return np_array
+
+
+def train_test_split_to_tensor(np_array, lookback, split_ratio=0.95):
+    '''Splits the data into train and test set'''
+
+    X = np_array[:, 1:]
+    X = dc(np.flip(X, axis=1)) # flip coloumns to change order from t-1, t-2, ... to t-2, t-1, ...
+    X = torch.tensor(X, dtype=torch.float32)
+    y = np_array[:, 0]
+    y = torch.tensor(y, dtype=torch.float32)
+
+    split_index = int(len(X) * split_ratio)
+
+    X_train = X[:split_index].unsqueeze(2)
+    X_test = X[split_index:].unsqueeze(2)
+
+    y_train = y[:split_index].unsqueeze(1)
+    y_test = y[split_index:].unsqueeze(1)
+
+    return X_train, y_train, X_test, y_test
+
 
 
 ### EVALUATION METRICS ###
