@@ -94,45 +94,67 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 ### DATA PREPROCESSING ###
 
-def add_lagged_data(df: pd.DataFrame, lag, convert_to_numpy=True):
-    '''Returns a numpy array of the dataframe with lagged features'''
+def add_lagged_data(df: pd.DataFrame, lag, columns, convert_to_numpy=True):
+    '''Returns a dataframe or a numpy array of the dataframe with lagged features, ensuring the shape is (n_samples, num_original_columns * (lag+1), num_original_columns) when converted to numpy array.'''
 
-    df = dc(df) # make a copy of the dataframe to prevent changes to the original dataframe
+    df = df.copy()  # make a copy of the dataframe to prevent changes to the original dataframe
+    df.set_index('Date', inplace=True)  # set Date as index
+    df_columns = df.columns.tolist()
 
-    df.set_index('Date', inplace=True) # set Date as index
+    # check if columns are present and in correct order
+    if df_columns != columns:
+        raise ValueError(f'Order of given columns does not match the order of the actual columns:\ngiven columns: {columns}\nactual columns: {df_columns}')
+    
+    lagged_data = [] # list to store lagged data
 
-    # create lagged features
     for i in range(1, lag + 1):
-        df[f'Close_t-{i}'] = df['Close'].shift(i) # shift the Close column by i steps
+        for column in columns:
+            # create lagged features
+            lagged = df[column].shift(i).rename(f'{column}_Lagged_{i}')
+            
+            # make sure, that the columns have the same order as in the original dataframe
+            lagged_data.append(lagged)
 
-    df.dropna(inplace=True)
+    # Concatenate the lagged data with the original dataframe
+    # shape: (n_samples, num_original_columns * (lag+1))
+    # e.g. (7000, 16) for 7000 samples, 2 original columns and lag=7
+    df_lagged = pd.concat([df] + lagged_data, axis=1)
+
+    # Drop the initial rows which contain NaN values due to the shifting
+    df_lagged.dropna(inplace=True)
 
     if convert_to_numpy:
-        df = df.to_numpy() # convert dataframe to numpy array
-
-    return df
+        # Reshape the dataframe to have the shape (n_samples, num_original_columns * (lag+1), num_original_columns)
+        np_array = df_lagged.to_numpy().reshape(df_lagged.shape[0], -1, len(columns))
+        return np_array
+    else:
+        return df_lagged
 
 
 def scale_data(np_array, scaler):
-    '''Scales the data using the specified scaler'''
+    '''Scales each feature individually using the given scaler and returns the scaled numpy array.'''
+    n_features_per_timestep = np_array.shape[-1]
 
-    np_array = scaler.fit_transform(np_array)
+    # scale each feature individually
+    for i in range(n_features_per_timestep):
+        np_array[:, :, i] = scaler.fit_transform(np_array[:, :, i])
+
     return np_array
 
 
-def train_test_split_to_tensor(np_array, lookback, split_ratio=0.95):
-    '''Splits the data into train and test set'''
+def train_test_split_to_tensor(np_array, split_ratio=0.95):
+    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
 
     X = np_array[:, 1:]
     X = dc(np.flip(X, axis=1)) # flip coloumns to change order from t-1, t-2, ... to t-2, t-1, ...
     X = torch.tensor(X, dtype=torch.float32)
-    y = np_array[:, 0]
+    y = np_array[:, 0, 0] # only take the closing price as target, ignore the other features
     y = torch.tensor(y, dtype=torch.float32)
 
     split_index = int(len(X) * split_ratio)
 
-    X_train = X[:split_index].unsqueeze(2)
-    X_test = X[split_index:].unsqueeze(2)
+    X_train = X[:split_index]
+    X_test = X[split_index:]
 
     y_train = y[:split_index].unsqueeze(1)
     y_test = y[split_index:].unsqueeze(1)
