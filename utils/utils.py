@@ -142,6 +142,20 @@ def scale_data(np_array, scaler):
     return np_array
 
 
+def scale_data_same_scaler(np_array, scaler):
+    '''Scales features together using the given scaler and returns the scaled numpy array.'''
+    n_samples = np_array.shape[0]  
+    n_timesteps = np_array.shape[1]
+
+    np_array = np_array.reshape(-1, 2)
+
+    np_array = scaler.fit_transform(np_array)
+    
+    np_array = np_array.reshape(n_samples, n_timesteps, 2)
+
+    return np_array
+
+
 def train_test_split_to_tensor(np_array, split_ratio=0.95):
     '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
 
