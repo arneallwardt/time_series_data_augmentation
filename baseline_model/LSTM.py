@@ -62,7 +62,7 @@ def train_one_epoch(
             
             # log training loss 
             avg_train_loss_across_batches = running_train_loss / log_interval
-            print(f'Batch: {batch_index}, Loss: {avg_train_loss_across_batches}')
+            # print(f'Batch: {batch_index}, Loss: {avg_train_loss_across_batches}')
 
             # update learning rate
             if(scheduler is not None):
