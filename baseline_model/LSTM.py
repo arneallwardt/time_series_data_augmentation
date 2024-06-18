@@ -49,7 +49,7 @@ def train_one_epoch(
     running_train_loss = 0.0
 
     for batch_index, batch in enumerate(train_loader):
-        x_batch, y_batch = batch[0].to(device), batch[1].to(device)
+        x_batch, y_batch = batch[0].to(device), batch[1].to(device)  
 
         train_pred = model(x_batch)
         train_loss = criterion(train_pred, y_batch)
