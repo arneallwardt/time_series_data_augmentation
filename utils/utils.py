@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy as dc
 from scipy.spatial.distance import pdist, squareform 
+from sklearn.preprocessing import MinMaxScaler
 
 
 ### DATA VISUALIZATION ###
@@ -92,10 +93,11 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 
 
-### DATA PREPROCESSING ###
+### BASELINE MODEL DATA PREPROCESSING ###
 
 def add_lagged_data(df: pd.DataFrame, lag, columns, convert_to_numpy=True):
     '''Returns a dataframe or a numpy array of the dataframe with lagged features, ensuring the shape is (n_samples, num_original_columns * (lag+1), num_original_columns) when converted to numpy array.'''
+    lagged_data = [] # list to store lagged data
 
     df = df.copy()  # make a copy of the dataframe to prevent changes to the original dataframe
     df.set_index('Date', inplace=True)  # set Date as index
@@ -105,8 +107,7 @@ def add_lagged_data(df: pd.DataFrame, lag, columns, convert_to_numpy=True):
     if df_columns != columns:
         raise ValueError(f'Order of given columns does not match the order of the actual columns:\ngiven columns: {columns}\nactual columns: {df_columns}')
     
-    lagged_data = [] # list to store lagged data
-
+    print(f'Adding lagged data for columns: {columns}')
     for i in range(1, lag + 1):
         for column in columns:
             # create lagged features
@@ -126,19 +127,37 @@ def add_lagged_data(df: pd.DataFrame, lag, columns, convert_to_numpy=True):
     if convert_to_numpy:
         # Reshape the dataframe to have the shape (n_samples, num_original_columns * (lag+1), num_original_columns)
         np_array = df_lagged.to_numpy().reshape(df_lagged.shape[0], -1, len(columns))
+        print(f'Shape of the numpy array wit lagged data: {np_array.shape}')
         return np_array
     else:
         return df_lagged
 
 
-def scale_data(np_array, scaler):
-    '''Scales each feature individually using the given scaler and returns the scaled numpy array.'''
+def scale_data(np_array):
+    '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
     n_features_per_timestep = np_array.shape[-1]
+    scalers = []
 
-    # scale each feature individually
+    # scale each feature individually and save the scalers to inverse scale the data later
     for i in range(n_features_per_timestep):
-        np_array[:, :, i] = scaler.fit_transform(np_array[:, :, i])
+        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
+        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
 
+    return np_array, scalers[0]
+
+
+def inverse_scale_data(np_array, scaler, lag):
+    # create dummies to match the required shape of the scaler and set the first column to the array to scale
+    dummies = np.zeros((np_array.shape[0], lag+1))
+    dummies[:, 0] = np_array.flatten()
+
+    # inverse scale the data
+    dummies_scaled = scaler.inverse_transform(dummies)
+
+    # get only first column of the dummies_scaled array, since this is where the original data was
+    np_array = dc(dummies_scaled[:, 0])
+
+    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
     return np_array
 
 
@@ -173,6 +192,7 @@ def train_test_split_to_tensor(np_array, split_ratio=0.95):
     y_train = y[:split_index].unsqueeze(1)
     y_test = y[split_index:].unsqueeze(1)
 
+    print(f'Shape of X_train: {X_train.shape} \n Shape of y_train: {y_train.shape} \n Shape of X_test: {X_test.shape} \n Shape of y_test: {y_test.shape}')
     return X_train, y_train, X_test, y_test
 
 

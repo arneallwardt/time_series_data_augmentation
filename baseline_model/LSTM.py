@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 class LSTM(nn.Module):
     def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
@@ -31,3 +32,104 @@ class LSTM(nn.Module):
         out, _ = self.lstm(x, (h0, c0)) # get output of LSTM layer
         out = self.fc(out[:, -1, :]) # run output through fully connected layer
         return out
+    
+
+def train_one_epoch(
+        model, 
+        train_loader, 
+        criterion, 
+        optimizer, 
+        device, 
+        log_interval=100, 
+        scheduler=None):
+    
+    '''Trains the model for one epoch and returns the average training loss. If a scheduler is provided, the learning rate is updated.'''
+    
+    model.train()
+    running_train_loss = 0.0
+
+    for batch_index, batch in enumerate(train_loader):
+        x_batch, y_batch = batch[0].to(device), batch[1].to(device)
+
+        train_pred = model(x_batch)
+        train_loss = criterion(train_pred, y_batch)
+        running_train_loss += train_loss.item()
+        optimizer.zero_grad()
+        train_loss.backward()
+        optimizer.step()
+
+        if batch_index % log_interval == 0:
+            
+            # log training loss 
+            avg_train_loss_across_batches = running_train_loss / log_interval
+            print(f'Batch: {batch_index}, Loss: {avg_train_loss_across_batches}')
+
+            # update learning rate
+            if(scheduler is not None):
+                current_learning_rate = scheduler.get_last_lr()
+                scheduler.step(avg_train_loss_across_batches)
+                if current_learning_rate != scheduler.get_last_lr():
+                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}')
+
+            running_train_loss = 0.0 # reset running loss
+
+
+def validate_one_epoch(
+        model, 
+        test_loader, 
+        criterion, 
+        device):
+    
+    '''Validates the model and returns the average validation loss.'''
+    
+    model.eval()
+    running_test_loss = 0.0
+
+    with torch.inference_mode():
+        for _, batch in enumerate(test_loader):
+            x_batch, y_batch = batch[0].to(device), batch[1].to(device)
+
+            test_pred = model(x_batch)
+            test_loss = criterion(test_pred, y_batch)
+            running_test_loss += test_loss.item()
+
+    # log validation loss
+    avg_test_loss_across_batches = running_test_loss / len(test_loader)
+    print(f'Validation Loss: {avg_test_loss_across_batches}')
+    return avg_test_loss_across_batches
+
+
+def train_model(
+        model, 
+        train_loader, 
+        test_loader, 
+        criterion, 
+        optimizer, 
+        device,
+        patience=10, 
+        num_epochs=1000):
+    
+    '''Trains the model and returns the trained model. Stops training if the validation loss does not improve for patience epochs.'''
+    
+    best_validation_loss = np.inf
+    num_epoch_without_improvement = 0
+    for epoch in range(num_epochs):
+        print(f'Epoch: {epoch + 1}')
+        train_one_epoch(model, train_loader, criterion, optimizer, device)
+        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device)
+        
+        # early stopping
+        if current_validation_loss < best_validation_loss:
+            best_validation_loss = current_validation_loss
+            num_epoch_without_improvement = 0
+        else:
+            print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
+            num_epoch_without_improvement += 1
+
+        if num_epoch_without_improvement >= patience:
+            print(f'Early stopping after {epoch + 1} epochs')
+            break
+
+        print(f'*' * 50)
+
+    return best_validation_loss, model
