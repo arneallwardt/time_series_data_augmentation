@@ -91,6 +91,7 @@ def real_data_loading (data_name, seq_len):
   
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
+    print(f'ori data shape: {ori_data.shape}')
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
         
@@ -98,17 +99,26 @@ def real_data_loading (data_name, seq_len):
   ori_data = ori_data[::-1]
   # Normalize the data
   ori_data = MinMaxScaler(ori_data)
+
     
   # Preprocess the dataset
   temp_data = []    
   # Cut data by sequence length
   for i in range(0, len(ori_data) - seq_len):
-    _x = ori_data[i:i + seq_len]
+    _x = ori_data[i:i + seq_len] # trim data to sequence length
     temp_data.append(_x)
+
+  print(f'length of temp data: {len(temp_data)}')
+  print(f'len(ori_data) // seq_len: {len(ori_data) // seq_len}')
+  print(f'first element of temp_data:')
+  print(temp_data[0])
         
   # Mix the datasets (to make it similar to i.i.d)
-  idx = np.random.permutation(len(temp_data))    
+  idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
+  print(f'random indices: {idx[:10]}')
   data = []
+
+  # shuffle data using the random indices
   for i in range(len(temp_data)):
     data.append(temp_data[idx[i]])
     

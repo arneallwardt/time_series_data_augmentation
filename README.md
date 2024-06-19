@@ -3,7 +3,7 @@ This repository contains Code for my bachelors thesis "**Untersuchung und Vergle
 
 ## Existing Implementations
 Already existing implementations of the following models were used and evaluated:
-- [TimeGAN](https://github.com/benearnthof/TimeGAN)
+- [TimeGAN](https://github.com/jsyoon0823/TimeGAN)
 
 ## Misc
 ### Explanation on how to copy other repos inside this repo:
