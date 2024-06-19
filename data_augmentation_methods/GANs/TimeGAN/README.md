@@ -1,27 +1,75 @@
-This implementation of TimeGAN was cloned from: https://github.com/benearnthof/TimeGAN
+# Codebase for "Time-series Generative Adversarial Networks (TimeGAN)"
 
-# TimeGAN
-A pytorch implementation of  Time-series Generative Adversarial Networks (https://github.com/jsyoon0823/TimeGAN) 
+Authors: Jinsung Yoon, Daniel Jarrett, Mihaela van der Schaar
 
-## Project Description
-The Goal was to create smoothed time series data via a GAN. This should be achieved via a combination of https://papers.nips.cc/paper/2019/file/c9efe5f26cd17ba6216bbe2a7d26d490-Paper.pdf and https://arxiv.org/pdf/2106.10414.pdf in PyTorch.
+Reference: Jinsung Yoon, Daniel Jarrett, Mihaela van der Schaar, 
+"Time-series Generative Adversarial Networks," 
+Neural Information Processing Systems (NeurIPS), 2019.
+ 
+Paper Link: https://papers.nips.cc/paper/8789-time-series-generative-adversarial-networks
 
-## Summary 
-A recreation of the results of the original Time GAN paper is very hard to achieve. This is possibly due to a number of reasons. With the training time and computational power that was within our reach, it seems like our Generator tended strongly to learning one specific simple curve, often shaped like a hook, a right angle or a straight line. This was verified during multiple training runs, and can be seen in the demo notebooks. The reason might also lie in the nature of GANs, as the training process is often very fiddly and unstable. (Thanks to Tobias Webers numerous hints in his mail.). However, during one run, our Generator managed to escape the basic shape that occured most of the times, and started producing two different smoothed out curves. This progress was also visible in the visual comparison. Please refer to the best demo run notebook for these results. The third and final reason for the difficulties we faced, might lie in the paper itself, as many people struggled to reproduce the claimed results as can be seen in the github issues of the original implementation. For one example, the Authors claim they used a Wiener Process to sample data for the paper, but their implementation uses a uniform generator instead.
+Contact: jsyoon0823@gmail.com
 
-In general, we think we might be able to produce better results with careful selection of hyper parameters and more extensive training. As we struggled to reproduce the Time GAN results, we did not conduct the implementation of the ada FNN layer as we did not expect a positive result on the outcome. 
-Additionally, the AdaFNN code was already fully available in Pytorch, so there it would have made no sense to "translate" the code. In general it should be possible to swap out the Embedding network in TimeGAN for an AdaFNN layer. Working with functional data should greatly benefit from this added "compression" step and lead to better learning in the Generator. 
+This directory contains implementations of TimeGAN framework for synthetic time-series data generation
+using one synthetic dataset and two real-world datasets.
 
-## Repository Structure: 
-requirements.txt contains all dependencies and can be run with pip: 
-pip install -r requirements.txt 
+-   Sine data: Synthetic
+-   Stock data: https://finance.yahoo.com/quote/GOOG/history?p=GOOG
+-   Energy data: http://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
 
-utils.py contains all helper functions, mostly from the original repository
+To run the pipeline for training and evaluation on TimeGAN framwork, simply run 
+python3 -m main_timegan.py or see jupyter-notebook tutorial of TimeGAN in tutorial_timegan.ipynb.
 
-preprocess_eeg_data.R is used to preprocess the eeg data provided to us and make it usable for TimeGAN
+Note that any model architecture can be used as the generator and 
+discriminator model such as RNNs or Transformers. 
 
-modules_and_training contains the main implementation of TimeGAN. The Network blocks are defined there, aswell as a function that runs training and returns the trained networks. 
+### Code explanation
 
-demo_multivariat.ipynb and demo_univariat.ipynb contain demos for the respective cases, aswell as analyses of their results
+(1) data_loading.py
+- Transform raw time-series data to preprocessed time-series data (Googld data)
+- Generate Sine data
 
-best_demo_run.ipynb contains the best training run we obtained while experimenting with different hyperparameter settings. 
+(2) Metrics directory
+  (a) visualization_metrics.py
+  - PCA and t-SNE analysis between Original data and Synthetic data
+  (b) discriminative_metrics.py
+  - Use Post-hoc RNN to classify Original data and Synthetic data
+  (c) predictive_metrics.py
+  - Use Post-hoc RNN to predict one-step ahead (last feature)
+
+(3) timegan.py
+- Use original time-series data as training set to generater synthetic time-series data
+
+(4) main_timegan.py
+- Report discriminative and predictive scores for the dataset and t-SNE and PCA analysis
+
+(5) utils.py
+- Some utility functions for metrics and timeGAN.
+
+### Command inputs:
+
+-   data_name: sine, stock, or energy
+-   seq_len: sequence length
+-   module: gru, lstm, or lstmLN
+-   hidden_dim: hidden dimensions
+-   num_layers: number of layers
+-   iterations: number of training iterations
+-   batch_size: the number of samples in each batch
+-   metric_iterations: number of iterations for metric computation
+
+Note that network parameters should be optimized for different datasets.
+
+### Example command
+
+```shell
+$ python3 main_timegan.py --data_name stock --seq_len 24 --module gru
+--hidden_dim 24 --num_layer 3 --iteration 50000 --batch_size 128 
+--metric_iteration 10
+```
+
+### Outputs
+
+-   ori_data: original data
+-   generated_data: generated synthetic data
+-   metric_results: discriminative and predictive scores
+-   visualization: PCA and tSNE analysis
