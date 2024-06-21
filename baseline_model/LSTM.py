@@ -49,7 +49,7 @@ def train_one_epoch(
     running_train_loss = 0.0
 
     for batch_index, batch in enumerate(train_loader):
-        x_batch, y_batch = batch[0].to(device), batch[1].to(device)  
+        x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)  
 
         train_pred = model(x_batch)
         train_loss = criterion(train_pred, y_batch)
@@ -87,7 +87,7 @@ def validate_one_epoch(
 
     with torch.inference_mode():
         for _, batch in enumerate(test_loader):
-            x_batch, y_batch = batch[0].to(device), batch[1].to(device)
+            x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)
 
             test_pred = model(x_batch)
             test_loss = criterion(test_pred, y_batch)
