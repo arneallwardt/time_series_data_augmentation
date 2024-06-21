@@ -162,7 +162,7 @@ def inverse_scale_data(np_array, scaler, lag):
 
 
 def scale_data_same_scaler(np_array, scaler):
-    '''Scales features together using the given scaler and returns the scaled numpy array.'''
+    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
     n_samples = np_array.shape[0]  
     n_timesteps = np_array.shape[1]
 
