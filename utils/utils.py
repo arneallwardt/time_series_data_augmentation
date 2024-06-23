@@ -46,7 +46,7 @@ def plot_multiple_time_series_attributes(df: pd.DataFrame, title='Time Series', 
     columns = df.columns.tolist()
     for column in [x, y1, y2]:
         if column not in columns:
-            raise ValueError(f'Dataframe does not include one of the following column names: {[x, y1, y2]}.')
+            raise ValueError(f'Dataframe does not include the following column: {column}.')
         
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
