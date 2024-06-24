@@ -8,12 +8,36 @@ import pandas as pd
 Y1_COLOR = '#e07a5f'
 Y2_COLOR = '#81b29a'
 
-def load_time_series(path):
-    '''Loads time series and converts Data column into datetime object'''
+def load_complete_time_series(path):
+    '''
+    Loads time series and converts Data column into datetime object
+
+    Args:
+        - path: str, path to the csv file
+
+    Returns:
+        - df: pd.DataFrame, dataframe containing the time series data with shape (n_samples, n_features)
+    '''
 
     df = pd.read_csv(path)
     df['Date'] = pd.to_datetime(df['Date'])
     return df
+
+def load_sequential_time_series(path, shape):
+    '''
+    Loads sequential time series data from a csv file and reshapes it to the given shape.
+
+    Args:
+        - path: str, path to the csv file
+        - shape: tuple, shape of the np array to be returned in the form of (n_samples, seq_len, n_features)
+
+    Returns:
+        - loaded_generated_data: np.array, array containing the time series data with shape (n_samples, seq_len, n_features)
+    '''
+
+    no, seq_len, dim = shape
+    loaded_generated_data = np.loadtxt(path, delimiter=',')
+    loaded_generated_data = loaded_generated_data.reshape(no, seq_len, dim)
 
 
 def plot_time_series_attribute(df: pd.DataFrame, title='Time Series', x='Date', y='Close'):
@@ -90,7 +114,7 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 ### GENERAL DATA PREPROCESSING ###
 
-def split_data_into_sequences(data, seq_len):
+def split_data_into_sequences(data, seq_len, shuffle_data=False):
     '''
     Splits data into sequences of length seq_len.
 
@@ -100,9 +124,17 @@ def split_data_into_sequences(data, seq_len):
 
     Output:
         - split_data: 3 dimensional np array in the shape of (n_samples-seq_len, seq_len, n_features).
+            - sequences in DESCENDING order (earlier dates first) 
+            -> 01.01.2021, 02.01.2021, 03.01.2021, 04.01.2021, 05.01.2021, ...
     '''
     
     split_data = []
     for i in range(len(data)-seq_len):
         split_data.append(data[i:i+seq_len])
+
+    if shuffle_data:
+        split_data = np.array(split_data)
+        np.random.shuffle(split_data)
+
+    print(f'Shape of the data after splitting into sequences: {np.array(split_data).shape}')
     return np.array(split_data)
