@@ -119,7 +119,7 @@ def split_data_into_sequences(data, seq_len, shuffle_data=False):
     Splits data into sequences of length seq_len.
 
     Input: 
-        - data: 2 dimensional np array in the shape of (n_samples, n_features).
+        - data: 2 dimensional pd dataframe in the shape of (n_samples, n_features).
         - seq_len: length of the sequences
 
     Output:
@@ -127,6 +127,10 @@ def split_data_into_sequences(data, seq_len, shuffle_data=False):
             - sequences in DESCENDING order (earlier dates first) 
             -> 01.01.2021, 02.01.2021, 03.01.2021, 04.01.2021, 05.01.2021, ...
     '''
+
+    # drop Date column if it exists
+    if 'Date' in data.columns:
+        data = data.drop(columns=['Date'])
     
     split_data = []
     for i in range(len(data)-seq_len):
