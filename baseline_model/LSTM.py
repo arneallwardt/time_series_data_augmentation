@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
+from copy import deepcopy as dc
+from sklearn.preprocessing import MinMaxScaler
 
 class LSTM(nn.Module):
     def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
@@ -33,6 +36,9 @@ class LSTM(nn.Module):
         out = self.fc(out[:, -1, :]) # run output through fully connected layer
         return out
     
+
+
+### TRAIN AND TEST LOOP ###
 
 def train_one_epoch(
         model, 
@@ -133,3 +139,107 @@ def train_model(
         print(f'*' * 50)
 
     return best_validation_loss, model
+
+
+
+### DATA PREPROCESSING ###
+
+def add_lagged_data(df: pd.DataFrame, lag, columns, convert_to_numpy=True):
+    '''Returns a dataframe or a numpy array of the dataframe with lagged features, ensuring the shape is (n_samples, num_original_columns * (lag+1), num_original_columns) when converted to numpy array.'''
+    lagged_data = [] # list to store lagged data
+
+    df = df.copy()  # make a copy of the dataframe to prevent changes to the original dataframe
+    df.set_index('Date', inplace=True)  # set Date as index
+    df_columns = df.columns.tolist()
+
+    # check if columns are present and in correct order
+    if df_columns != columns:
+        raise ValueError(f'Order of given columns does not match the order of the actual columns:\ngiven columns: {columns}\nactual columns: {df_columns}')
+    
+    print(f'Adding lagged data for columns: {columns}')
+    for i in range(1, lag + 1):
+        for column in columns:
+            # create lagged features
+            lagged = df[column].shift(i).rename(f'{column}_Lagged_{i}')
+            
+            # make sure, that the columns have the same order as in the original dataframe
+            lagged_data.append(lagged)
+
+    # Concatenate the lagged data with the original dataframe
+    # shape: (n_samples, num_original_columns * (lag+1))
+    # e.g. (7000, 16) for 7000 samples, 2 original columns and lag=7
+    df_lagged = pd.concat([df] + lagged_data, axis=1)
+
+    # Drop the initial rows which contain NaN values due to the shifting
+    df_lagged.dropna(inplace=True)
+
+    if convert_to_numpy:
+        # Reshape the dataframe to have the shape (n_samples, num_original_columns * (lag+1), num_original_columns)
+        np_array = df_lagged.to_numpy().reshape(df_lagged.shape[0], -1, len(columns))
+        print(f'Shape of the numpy array wit lagged data: {np_array.shape}')
+        return np_array
+    else:
+        return df_lagged
+
+
+def scale_data(np_array):
+    '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
+    n_features_per_timestep = np_array.shape[-1]
+    scalers = []
+
+    # scale each feature individually and save the scalers to inverse scale the data later
+    for i in range(n_features_per_timestep):
+        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
+        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
+
+    return np_array, scalers[0]
+
+
+def inverse_scale_data(np_array, scaler, lag):
+    # create dummies to match the required shape of the scaler and set the first column to the array to scale
+    dummies = np.zeros((np_array.shape[0], lag+1))
+    dummies[:, 0] = np_array.flatten()
+
+    # inverse scale the data
+    dummies_scaled = scaler.inverse_transform(dummies)
+
+    # get only first column of the dummies_scaled array, since this is where the original data was
+    np_array = dc(dummies_scaled[:, 0])
+
+    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
+    return np_array
+
+
+def scale_data_same_scaler(np_array, scaler):
+    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
+    n_samples = np_array.shape[0]  
+    n_timesteps = np_array.shape[1]
+
+    np_array = np_array.reshape(-1, 2)
+
+    np_array = scaler.fit_transform(np_array)
+    
+    np_array = np_array.reshape(n_samples, n_timesteps, 2)
+
+    return np_array
+
+
+def train_test_split_to_tensor(np_array, split_ratio=0.95):
+    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
+
+    X = np_array[:, 1:]
+    X = dc(np.flip(X, axis=1)) # flip coloumns to change order from t-1, t-2, ... to t-2, t-1, ...
+    X = torch.tensor(X, dtype=torch.float32)
+    y = np_array[:, 0, 0] # only take the closing price as target, ignore the other features
+    y = torch.tensor(y, dtype=torch.float32)
+
+    split_index = int(len(X) * split_ratio)
+
+    X_train = X[:split_index]
+    X_test = X[split_index:]
+
+    y_train = y[:split_index].unsqueeze(1)
+    y_test = y[split_index:].unsqueeze(1)
+
+    print(f'Shape of X_train: {X_train.shape} \n Shape of y_train: {y_train.shape} \n Shape of X_test: {X_test.shape} \n Shape of y_test: {y_test.shape}')
+    return X_train, y_train, X_test, y_test
