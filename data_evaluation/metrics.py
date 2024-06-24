@@ -48,6 +48,41 @@ def pca(real, syn):
     plt.show()
 
 
+def tsne(real, syn, no_samples):
+    '''
+    t-Distributed Stochastic Neighbor Embedding (t-SNE) is a dimensionality reduction technique for embedding high-dimensional data for visualization in a low-dimensional space
+
+    Args:
+        - real: np.array of size (n_samples, seq_len*features), flattened original data
+        - syn: np.array of size (n_samples, seq_len*features), flattened synthetic data
+        - no_samples: int, number of samples for each synthetic and real data to be used for visualization
+    '''
+
+    colors = ["red" for i in range(no_samples)] + ["blue" for i in range(no_samples)]  
+
+    # Do t-SNE Analysis together       
+    data_final = np.concatenate((real, syn), axis = 0)
+    
+    # TSNE anlaysis
+    tsne = TSNE(n_components = 2, verbose = 1, perplexity = 40, n_iter = 300)
+    tsne_results = tsne.fit_transform(data_final) # shape: (2*no_samples, 2)
+      
+    # Plotting
+    f, ax = plt.subplots(1)
+      
+    plt.scatter(tsne_results[:no_samples,0], tsne_results[:no_samples,1], 
+                c = colors[:no_samples], alpha = 0.2, label = "Original") # original data can be accessed by slicing the first no_samples
+    plt.scatter(tsne_results[no_samples:,0], tsne_results[no_samples:,1], 
+                c = colors[no_samples:], alpha = 0.2, label = "Synthetic") # synthetic data can be accessed by slicing the last no_samples
+  
+    ax.legend()
+      
+    plt.title('t-SNE plot')
+    plt.xlabel('x-tsne')
+    plt.ylabel('y_tsne')
+    plt.show()  
+
+
 ### EVALUATION WORKFLOW
 
 def visualize(data_real, data_syn, metric, mean_flatten = False):
@@ -99,5 +134,5 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
         pca(prep_data_real, prep_data_syn)
 
     elif metric == 'tsne':
-        pass
+        tsne(prep_data_real, prep_data_syn, no_samples)
     
