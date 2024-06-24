@@ -145,8 +145,11 @@ def train_model(
 ### DATA PREPROCESSING ###
 
 
-def scale_data(np_array):
+def scale_data(data):
     '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
+
+    np_array = dc(data)
+    
     n_features_per_timestep = np_array.shape[-1]
     scalers = []
 
@@ -195,6 +198,10 @@ def train_test_split_to_tensor(np_array, split_ratio=0.95):
     X = torch.tensor(X, dtype=torch.float32)
     y = np_array[:, -1, 0] # only take the closing price as target, ignore the other features
     y = torch.tensor(y, dtype=torch.float32)
+
+    # for TSTR, TRTS
+    if split_ratio == -1:
+        return X, y
 
     split_index = int(len(X) * split_ratio)
 
