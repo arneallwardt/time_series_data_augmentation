@@ -105,17 +105,11 @@ def real_data_loading (data_name, seq_len):
   temp_data = []    
   # Cut data by sequence length
   for i in range(0, len(ori_data) - seq_len):
-    _x = ori_data[i:i + seq_len] # trim data to sequence length
+    _x = ori_data[i:i + seq_len] # get one sequence of data
     temp_data.append(_x)
-
-  print(f'length of temp data: {len(temp_data)}')
-  print(f'len(ori_data) // seq_len: {len(ori_data) // seq_len}')
-  print(f'first element of temp_data:')
-  print(temp_data[0])
         
   # Mix the datasets (to make it similar to i.i.d)
   idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
-  print(f'random indices: {idx[:10]}')
   data = []
 
   # shuffle data using the random indices
