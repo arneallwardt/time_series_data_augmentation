@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy as dc
-from scipy.spatial.distance import pdist, squareform 
 from sklearn.preprocessing import MinMaxScaler
 
 
@@ -197,17 +196,21 @@ def train_test_split_to_tensor(np_array, split_ratio=0.95):
 
 
 
-### EVALUATION METRICS ###
+### GENERAL DATA PREPROCESSING ###
 
-def maximum_mean_discrepancy(X, Y):
+def split_data_into_sequences(data, seq_len):
     '''
-    maximum mean discrepancy (mmd) is a metric for comparing the distribution of 2 datasets
-    '''
+    Splits data into sequences of length seq_len.
 
-    def _gaussian_kernel(x, y, sigma=1.0):
-        return np.exp(-np.linalg.norm(x - y) ** 2 / (2 * sigma ** 2))
+    Input: 
+        - data: 2 dimensional np array in the shape of (n_samples, n_features).
+        - seq_len: length of the sequences
+
+    Output:
+        - split_data: 3 dimensional np array in the shape of (n_samples-seq_len, seq_len, n_features).
+    '''
     
-    XX = squareform(pdist(X, metric=lambda x, y: _gaussian_kernel(x, y)))
-    YY = squareform(pdist(Y, metric=lambda x, y: _gaussian_kernel(x, y)))
-    XY = np.array([[_gaussian_kernel(x, y) for y in Y] for x in X])
-    return XX.mean() + YY.mean() - 2 * XY.mean()
+    split_data = []
+    for i in range(len(data)-seq_len):
+        split_data.append(data[i:i+seq_len])
+    return np.array(split_data)
