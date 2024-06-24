@@ -1,7 +1,6 @@
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import pdist, squareform 
-from utils import split_data_into_sequences
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -25,6 +24,10 @@ def pca(real, syn):
     '''
     Principal Component Analysis (PCA) is a dimensionality reduction technique that can be used to reduce a large number of variables to a smaller number of variables while preserving as much variance as possible.
     It is used to visualize the data in 2D and compare the distributions of the original and synthetic data.
+
+    Args:
+        - real: np.array of size (n_samples, seq_len*features), flattened original data
+        - syn: np.array of size (n_samples, seq_len*features), flattened synthetic data
     '''
 
     # Fit PCA
@@ -47,16 +50,15 @@ def pca(real, syn):
 
 ### EVALUATION WORKFLOW
 
-def visualize(data_real, data_syn, metric, split_data, mean_flatten = False):
+def visualize(data_real, data_syn, metric, mean_flatten = False):
     '''
     Visualizes the original and synthetic data using PCA or tSNE
+
+    Args:
+        - data_real: np.array of size (n_samples, seq_len, n_features), original data
+        - data_syn: np.array of size (n_samples, seq_len, n_features), synthetic data
+        - mean_flatten: bool, whether or not to use the mean of the features or original values of the features for evaluating
     '''
-
-    # split data into sequences if in original format
-    if split_data:
-        data_real = split_data_into_sequences(data_real, seq_len=24)
-        data_syn = split_data_into_sequences(data_syn, seq_len=24)
-
 
     print(f'Preprocessing data. Shape: {data_real.shape}')
 

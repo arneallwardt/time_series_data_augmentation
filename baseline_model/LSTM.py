@@ -115,7 +115,7 @@ def train_model(
         patience=10, 
         num_epochs=1000):
     
-    '''Trains the model and returns the trained model. Stops training if the validation loss does not improve for patience epochs.'''
+    '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''
     
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
@@ -196,6 +196,7 @@ def scale_data(np_array):
 
 
 def inverse_scale_data(np_array, scaler, lag):
+    '''Inverse scales the data using the given scaler and returns the inverse scaled numpy array.'''
     # create dummies to match the required shape of the scaler and set the first column to the array to scale
     dummies = np.zeros((np_array.shape[0], lag+1))
     dummies[:, 0] = np_array.flatten()
