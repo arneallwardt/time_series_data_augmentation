@@ -17,6 +17,9 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, feat
 
     ### Data Preprocessing
 
+    X_real_unscaled, y_real_unscaled = train_test_split_to_tensor(data_real_split, split_ratio=-1)
+    X_syn_unscaled, y_syn_unscaled = train_test_split_to_tensor(data_syn_split, split_ratio=-1)
+
     # scale data
     prep_data_real, scaler_real = scale_data(data_real_split)
     prep_data_syn, scaler_syn = scale_data(data_syn_split)
@@ -32,7 +35,8 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, feat
     real_data_loader = DataLoader(dataset_real, batch_size=hyperparameters["batch_size"], shuffle=False)
     syn_data_loader = DataLoader(dataset_syn, batch_size=hyperparameters["batch_size"], shuffle=False)
 
-    criterion = nn.MSELoss()
+    criterion_MSE = nn.MSELoss()
+    criterion_MAE = nn.L1Loss()
 
 
     ### Train on Real, Test on Synthetic (TRTS)
@@ -46,14 +50,19 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, feat
 
     TRTS_optimizer = torch.optim.Adam(TRTS_model.parameters(), lr=hyperparameters["lr"])
 
-    results["TRTS_validation_loss"], _ = train_model(
+    results["TRTS_MSE"], _ = train_model(
         model=TRTS_model,
         train_loader=real_data_loader,
         test_loader=syn_data_loader,
-        criterion=criterion,
+        criterion=criterion_MSE,
         optimizer=TRTS_optimizer,
         device=device
     )
+
+    with torch.inference_mode():
+        TRTS_model.eval()
+        TRTS_preds_unscaled = TRTS_model(X_syn_unscaled)
+        results["TRTS_MAE"] = criterion_MAE(TRTS_preds_unscaled, y_syn_unscaled).item()
 
 
     ### Train on Synthetic, Test on Real (TSTR)
@@ -67,13 +76,19 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, feat
 
     TSTR_optimizer = torch.optim.Adam(TSTR_model.parameters(), lr=hyperparameters["lr"])
 
-    results["TSTR_validation_loss"], _ = train_model(
+    results["TSTR_MSE"], _ = train_model(
         model=TSTR_model,
         train_loader=syn_data_loader,
         test_loader=real_data_loader,
-        criterion=criterion,
+        criterion=criterion_MSE,
         optimizer=TSTR_optimizer,
         device=device
     )
+
+    with torch.inference_mode():
+        TSTR_model.eval()
+        TSTR_preds_unscaled = TSTR_model(X_real_unscaled)
+        results["TSTR_MAE"] = criterion_MAE(TSTR_preds_unscaled, y_real_unscaled).item()
+
 
     return results
