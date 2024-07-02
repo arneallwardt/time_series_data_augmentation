@@ -142,3 +142,17 @@ def split_data_into_sequences(data, seq_len, shuffle_data=False):
 
     print(f'Shape of the data after splitting into sequences: {np.array(split_data).shape}')
     return np.array(split_data)
+
+
+def reconstruct_sequential_data(data):
+    '''
+    Reconstructs the original data from sequences of data.
+
+    Input: 
+        - data: 3 dimensional np array in the shape of (n_samples, seq_len, n_features).
+
+    Output:
+        - reconstructed_data: 2 dimensional np array in the shape of (n_samples, n_features).
+    '''
+
+    return data[:, -1, :]
