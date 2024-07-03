@@ -46,6 +46,7 @@ def train_one_epoch(
         criterion, 
         optimizer, 
         device, 
+        verbose=True,
         log_interval=100, 
         scheduler=None):
     
@@ -75,7 +76,7 @@ def train_one_epoch(
                 current_learning_rate = scheduler.get_last_lr()
                 scheduler.step(avg_train_loss_across_batches)
                 if current_learning_rate != scheduler.get_last_lr():
-                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}')
+                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}') if verbose else None
 
             running_train_loss = 0.0 # reset running loss
 
@@ -84,7 +85,8 @@ def validate_one_epoch(
         model, 
         test_loader, 
         criterion, 
-        device):
+        device, 
+        verbose=True):
     
     '''Validates the model and returns the average validation loss.'''
     
@@ -101,7 +103,7 @@ def validate_one_epoch(
 
     # log validation loss
     avg_test_loss_across_batches = running_test_loss / len(test_loader)
-    print(f'Validation Loss: {avg_test_loss_across_batches}')
+    print(f'Validation Loss: {avg_test_loss_across_batches}') if verbose else None
     return avg_test_loss_across_batches
 
 
@@ -112,6 +114,7 @@ def train_model(
         criterion, 
         optimizer, 
         device,
+        verbose=True,
         patience=10, 
         num_epochs=1000):
     
@@ -120,23 +123,23 @@ def train_model(
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
-        print(f'Epoch: {epoch + 1}')
-        train_one_epoch(model, train_loader, criterion, optimizer, device)
-        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device)
+        print(f'Epoch: {epoch + 1}') if verbose else None
+        train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
+        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device, verbose=verbose)
         
         # early stopping
         if current_validation_loss < best_validation_loss:
             best_validation_loss = current_validation_loss
             num_epoch_without_improvement = 0
         else:
-            print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
+            print(f'INFO: Validation loss did not improve in epoch {epoch + 1}') if verbose else None
             num_epoch_without_improvement += 1
 
         if num_epoch_without_improvement >= patience:
-            print(f'Early stopping after {epoch + 1} epochs')
+            print(f'Early stopping after {epoch + 1} epochs') if verbose else None
             break
 
-        print(f'*' * 50)
+        print(f'*' * 50) if verbose else None
 
     return best_validation_loss, model
 

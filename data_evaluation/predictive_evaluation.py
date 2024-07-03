@@ -1,27 +1,23 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from baseline_model.LSTM import LSTM, train_model, scale_data, train_test_split_to_tensor, inverse_scale_data
 from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
-def predictive_evaluation(data_real_split, data_syn_split, hyperparameters):
+def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, verbose=True):
 
+    EVALUATION_RUNS = 10
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     _, seq_len, dim = data_real_split.shape
 
-    results = {
-        "TRTS_MSE": None,
-        "TRTS_MAE": None,
-        "TSTR_MSE": None,
-        "TSTR_MAE": None,
-        "combined_MSE": None,
-        "combined_MAE": None
-    }
-
+    results = pd.DataFrame(columns=['Model', 'Metric', 'Error'])
 
     ### Data Preprocessing
 
+    # save unscaled targets for evaluation later on
     _, y_real_unscaled = train_test_split_to_tensor(data_real_split, split_ratio=-1)
     _, y_syn_unscaled = train_test_split_to_tensor(data_syn_split, split_ratio=-1)
 
@@ -43,9 +39,13 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters):
 
     ### Data Preprocessing (Combined)
     
-    data_comb_unscaled = np.vstack((data_syn_split, data_real_split)) # remember to put synthetic data first, since train_test_split_to_tensor() will take the last samples (real data) as test set
-    _, _, _, y_comb_test_unscaled = train_test_split_to_tensor(data_comb_unscaled) # get unscaled test data for actual MAE later on
-    
+    # combine real and synthetic data
+    # remember to put synthetic data first, since train_test_split_to_tensor() will take the last samples (real data) as test set
+    data_comb_unscaled = np.vstack((data_syn_split, data_real_split))
+
+    # get unscaled test data for actual MAE later on
+    _, _, _, y_comb_test_unscaled = train_test_split_to_tensor(data_comb_unscaled)
+
     data_comb, scaler_comb = scale_data(data_comb_unscaled)
     X_comb_train, y_comb_train, X_comb_test, y_comb_test = train_test_split_to_tensor(data_comb)
     
@@ -61,85 +61,104 @@ def predictive_evaluation(data_real_split, data_syn_split, hyperparameters):
     criterion_MSE = nn.MSELoss()
     criterion_MAE = nn.L1Loss()
 
+    for _ in tqdm(range(EVALUATION_RUNS)):
 
-    ### Train on Real, Test on Synthetic (TRTS)
+        ### Train on Real, Test on Synthetic (TRTS)
 
-    TRTS_model = LSTM(
-        device=device,
-        input_size=dim,
-        hidden_size=hyperparameters["hidden_size"],
-        num_stacked_layers=hyperparameters["num_layers"]
-    ).to(device)
+        TRTS_model = LSTM(
+            device=device,
+            input_size=dim,
+            hidden_size=hyperparameters["hidden_size"],
+            num_stacked_layers=hyperparameters["num_layers"]
+        ).to(device)
 
-    TRTS_optimizer = torch.optim.Adam(TRTS_model.parameters(), lr=hyperparameters["lr"])
+        TRTS_optimizer = torch.optim.Adam(TRTS_model.parameters(), lr=hyperparameters["lr"])
 
-    results["TRTS_MSE"], _ = train_model(
-        model=TRTS_model,
-        train_loader=real_data_loader,
-        test_loader=syn_data_loader,
-        criterion=criterion_MSE,
-        optimizer=TRTS_optimizer,
-        device=device
-    )
+        _, _ = train_model(
+            model=TRTS_model,
+            train_loader=real_data_loader,
+            test_loader=syn_data_loader,
+            criterion=criterion_MSE,
+            optimizer=TRTS_optimizer,
+            device=device,
+            verbose=verbose
+        )
 
-    with torch.inference_mode():
-        TRTS_model.eval()
-        TRTS_preds = TRTS_model(X_syn.to(device))
-        TRTS_preds_unscaled = torch.tensor(inverse_scale_data(TRTS_preds.cpu().numpy(), scaler_syn, seq_len))
-        results["TRTS_MAE"] = criterion_MAE(TRTS_preds_unscaled, y_syn_unscaled)
+        with torch.inference_mode():
+            TRTS_model.eval()
+            TRTS_preds = TRTS_model(X_syn.to(device))
+            TRTS_preds_unscaled = torch.tensor(inverse_scale_data(TRTS_preds.cpu().numpy(), scaler_syn, seq_len))
 
+            mae = criterion_MAE(TRTS_preds_unscaled, y_syn_unscaled).item()
+            mse = criterion_MSE(TRTS_preds_unscaled, y_syn_unscaled).item()
 
-    ### Train on Synthetic, Test on Real (TSTR)
-
-    TSTR_model = LSTM(
-        device=device,
-        input_size=dim,
-        hidden_size=hyperparameters["hidden_size"],
-        num_stacked_layers=hyperparameters["num_layers"]
-    ).to(device)
-
-    TSTR_optimizer = torch.optim.Adam(TSTR_model.parameters(), lr=hyperparameters["lr"])
-
-    results["TSTR_MSE"], _ = train_model(
-        model=TSTR_model,
-        train_loader=syn_data_loader,
-        test_loader=real_data_loader,
-        criterion=criterion_MSE,
-        optimizer=TSTR_optimizer,
-        device=device
-    )
-
-    with torch.inference_mode():
-        TSTR_model.eval()
-        TSTR_preds = TSTR_model(X_real.to(device))
-        TSTR_preds_unscaled = torch.tensor(inverse_scale_data(TSTR_preds.cpu().numpy(), scaler_real, seq_len))
-        results["TSTR_MAE"] = criterion_MAE(TSTR_preds_unscaled, y_real_unscaled)
+            results = pd.concat([results, pd.DataFrame([{'Model': 'TRTS', 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
+            results = pd.concat([results, pd.DataFrame([{'Model': 'TRTS', 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
 
 
-    ### Combined Testing
+        ### Train on Synthetic, Test on Real (TSTR)
 
-    comb_model = LSTM(
-        device=device,
-        input_size=dim,
-        hidden_size=hyperparameters["hidden_size"],
-        num_stacked_layers=hyperparameters["num_layers"]
-    ).to(device)
+        TSTR_model = LSTM(
+            device=device,
+            input_size=dim,
+            hidden_size=hyperparameters["hidden_size"],
+            num_stacked_layers=hyperparameters["num_layers"]
+        ).to(device)
 
-    comb_optimizer = torch.optim.Adam(comb_model.parameters(), lr=hyperparameters["lr"])
+        TSTR_optimizer = torch.optim.Adam(TSTR_model.parameters(), lr=hyperparameters["lr"])
 
-    results["combined_MSE"], _ = train_model(
-        model=comb_model,
-        train_loader=comb_data_loader_train,
-        test_loader=comb_data_loader_test,
-        criterion=criterion_MSE,
-        optimizer=comb_optimizer,
-        device=device
-    )
+        _, _ = train_model(
+            model=TSTR_model,
+            train_loader=syn_data_loader,
+            test_loader=real_data_loader,
+            criterion=criterion_MSE,
+            optimizer=TSTR_optimizer,
+            device=device,
+            verbose=verbose
+        )
 
-    with torch.inference_mode():
-        comb_model.eval()
-        comb_preds = comb_model(X_comb_test.to(device))
-        comb_preds_unscaled = torch.tensor(inverse_scale_data(comb_preds.cpu().numpy(), scaler_comb, seq_len))
-        results["combined_MAE"] = criterion_MAE(comb_preds_unscaled, y_comb_test_unscaled)
+        with torch.inference_mode():
+            TSTR_model.eval()
+            TSTR_preds = TSTR_model(X_real.to(device))
+            TSTR_preds_unscaled = torch.tensor(inverse_scale_data(TSTR_preds.cpu().numpy(), scaler_real, seq_len))
+
+            mae = criterion_MAE(TSTR_preds_unscaled, y_real_unscaled).item()
+            mse = criterion_MSE(TSTR_preds_unscaled, y_real_unscaled).item()
+
+            results = pd.concat([results, pd.DataFrame([{'Model': 'TSTR', 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
+            results = pd.concat([results, pd.DataFrame([{'Model': 'TSTR', 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
+
+
+        ### Combined Testing
+
+        comb_model = LSTM(
+            device=device,
+            input_size=dim,
+            hidden_size=hyperparameters["hidden_size"],
+            num_stacked_layers=hyperparameters["num_layers"]
+        ).to(device)
+
+        comb_optimizer = torch.optim.Adam(comb_model.parameters(), lr=hyperparameters["lr"])
+
+        _, _ = train_model(
+            model=comb_model,
+            train_loader=comb_data_loader_train,
+            test_loader=comb_data_loader_test,
+            criterion=criterion_MSE,
+            optimizer=comb_optimizer,
+            device=device,
+            verbose=verbose
+        )
+
+        with torch.inference_mode():
+            comb_model.eval()
+            comb_preds = comb_model(X_comb_test.to(device))
+            comb_preds_unscaled = torch.tensor(inverse_scale_data(comb_preds.cpu().numpy(), scaler_comb, seq_len))
+
+            mae = criterion_MAE(comb_preds_unscaled, y_comb_test_unscaled).item()
+            mse = criterion_MSE(comb_preds_unscaled, y_comb_test_unscaled).item()
+
+            results = pd.concat([results, pd.DataFrame([{'Model': 'combined', 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
+            results = pd.concat([results, pd.DataFrame([{'Model': 'combined', 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
 
     return results
