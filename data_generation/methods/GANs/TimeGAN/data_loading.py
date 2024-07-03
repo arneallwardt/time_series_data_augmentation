@@ -87,10 +87,12 @@ def real_data_loading (data_name, seq_len):
   Returns:
     - data: preprocessed data.
   """  
-  assert data_name in ['stock','energy']
+  assert data_name in ['stock','energy', 'aapl']
   
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
+  elif data_name == 'aapl':
+    ori_data = np.loadtxt('../../../../data/real/AAPL_complete_no_date.csv', delimiter = ",",skiprows = 1)
     print(f'ori data shape: {ori_data.shape}')
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
