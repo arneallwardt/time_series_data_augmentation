@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
+from copy import deepcopy as dc
+from sklearn.preprocessing import MinMaxScaler
 
 class LSTM(nn.Module):
     def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
@@ -34,12 +37,16 @@ class LSTM(nn.Module):
         return out
     
 
+
+### TRAIN AND TEST LOOP ###
+
 def train_one_epoch(
         model, 
         train_loader, 
         criterion, 
         optimizer, 
         device, 
+        verbose=True,
         log_interval=100, 
         scheduler=None):
     
@@ -69,7 +76,7 @@ def train_one_epoch(
                 current_learning_rate = scheduler.get_last_lr()
                 scheduler.step(avg_train_loss_across_batches)
                 if current_learning_rate != scheduler.get_last_lr():
-                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}')
+                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}') if verbose else None
 
             running_train_loss = 0.0 # reset running loss
 
@@ -78,7 +85,8 @@ def validate_one_epoch(
         model, 
         test_loader, 
         criterion, 
-        device):
+        device, 
+        verbose=True):
     
     '''Validates the model and returns the average validation loss.'''
     
@@ -95,7 +103,7 @@ def validate_one_epoch(
 
     # log validation loss
     avg_test_loss_across_batches = running_test_loss / len(test_loader)
-    print(f'Validation Loss: {avg_test_loss_across_batches}')
+    print(f'Validation Loss: {avg_test_loss_across_batches}') if verbose else None
     return avg_test_loss_across_batches
 
 
@@ -106,30 +114,105 @@ def train_model(
         criterion, 
         optimizer, 
         device,
+        verbose=True,
         patience=10, 
         num_epochs=1000):
     
-    '''Trains the model and returns the trained model. Stops training if the validation loss does not improve for patience epochs.'''
+    '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''
     
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
-        print(f'Epoch: {epoch + 1}')
-        train_one_epoch(model, train_loader, criterion, optimizer, device)
-        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device)
+        print(f'Epoch: {epoch + 1}') if verbose else None
+        train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
+        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device, verbose=verbose)
         
         # early stopping
         if current_validation_loss < best_validation_loss:
             best_validation_loss = current_validation_loss
             num_epoch_without_improvement = 0
         else:
-            print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
+            print(f'INFO: Validation loss did not improve in epoch {epoch + 1}') if verbose else None
             num_epoch_without_improvement += 1
 
         if num_epoch_without_improvement >= patience:
-            print(f'Early stopping after {epoch + 1} epochs')
+            print(f'Early stopping after {epoch + 1} epochs') if verbose else None
             break
 
-        print(f'*' * 50)
+        print(f'*' * 50) if verbose else None
 
     return best_validation_loss, model
+
+
+
+### DATA PREPROCESSING ###
+
+
+def scale_data(data):
+    '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
+
+    np_array = dc(data)
+    
+    n_features_per_timestep = np_array.shape[-1]
+    scalers = []
+
+    # scale each feature individually and save the scalers to inverse scale the data later
+    for i in range(n_features_per_timestep):
+        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
+        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
+
+    return np_array, scalers[0]
+
+
+def inverse_scale_data(np_array, scaler, seq_len):
+    '''Inverse scales the data using the given scaler and returns the inverse scaled numpy array.'''
+    # create dummies to match the required shape of the scaler and set the first column to the array to scale
+    dummies = np.zeros((np_array.shape[0], seq_len))
+    dummies[:, 0] = np_array.flatten()
+
+    # inverse scale the data
+    dummies_scaled = scaler.inverse_transform(dummies)
+
+    # get only first column of the dummies_scaled array, since this is where the original data was
+    np_array = dc(dummies_scaled[:, 0])
+
+    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
+    return np_array
+
+
+def scale_data_same_scaler(np_array, scaler):
+    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
+    n_samples = np_array.shape[0]  
+    n_timesteps = np_array.shape[1]
+
+    np_array = np_array.reshape(-1, 2)
+
+    np_array = scaler.fit_transform(np_array)
+    
+    np_array = np_array.reshape(n_samples, n_timesteps, 2)
+
+    return np_array
+
+
+def train_test_split_to_tensor(np_array, split_ratio=0.95):
+    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
+
+    X = np_array[:, :-1]
+    X = torch.tensor(X, dtype=torch.float32)
+    y = np_array[:, -1, 0] # only take the closing price as target, ignore the other features
+    y = torch.tensor(y, dtype=torch.float32)
+
+    # for TSTR, TRTS
+    if split_ratio == -1:
+        return X, y
+
+    split_index = int(len(X) * split_ratio)
+
+    X_train = X[:split_index]
+    X_test = X[split_index:]
+
+    y_train = y[:split_index].unsqueeze(1)
+    y_test = y[split_index:].unsqueeze(1)
+
+    print(f'Shape of X_train: {X_train.shape} \n Shape of y_train: {y_train.shape} \n Shape of X_test: {X_test.shape} \n Shape of y_test: {y_test.shape}')
+    return X_train, y_train, X_test, y_test

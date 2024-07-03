@@ -1,5 +1,6 @@
 time_series_data_augmentation_venv/
 ba_venv_3_8_10/
+ba_venv_3_7_0/
 ba_venv/
 __pycache__/
 .DS_Store
