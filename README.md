@@ -6,6 +6,17 @@ Already existing implementations of the following models were used and evaluated
 - [TimeGAN](https://github.com/jsyoon0823/TimeGAN)
 - [QuantGAN](https://github.com/JamesSullivan/temporalCN)
 
+## Data Format
+### Real Data
+- **Close, Open, High, Low, Adj Close, Volume, (Date)**
+- Close is ALWAYS the first column
+
+### Sequential Data
+- Shape: **(num_samples, seq_len, num_features)**
+- the sequence is always in **descending order**
+    - e.g.: T-x, ..., T-2, T-1, T
+- saved to .csv with shape: **(num_samples, seq_len * num_features)**
+
 ## Misc
 ### Explanation on how to copy other repos inside this repo:
 - `git clone <url_of_repo_to_clone>` *clone repo*

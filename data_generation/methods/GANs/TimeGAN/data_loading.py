@@ -98,9 +98,9 @@ def real_data_loading (data_name, seq_len):
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
         
   # Flip the data to make chronological data
-  ori_data = ori_data[::-1]
+  # ori_data = ori_data[::-1]
   # Normalize the data
-  ori_data = MinMaxScaler(ori_data)
+  #ori_data = MinMaxScaler(ori_data)
 
     
   # Preprocess the dataset
@@ -111,11 +111,11 @@ def real_data_loading (data_name, seq_len):
     temp_data.append(_x)
         
   # Mix the datasets (to make it similar to i.i.d)
-  idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
-  data = []
+  # idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
+  # data = []
 
   # shuffle data using the random indices
-  for i in range(len(temp_data)):
-    data.append(temp_data[idx[i]])
+  # for i in range(len(temp_data)):
+  #   data.append(temp_data[idx[i]])
     
-  return data
+  return temp_data

@@ -23,7 +23,7 @@ def load_complete_time_series(path):
     df['Date'] = pd.to_datetime(df['Date'])
     return df
 
-def load_sequential_time_series(path, shape):
+def load_sequential_time_series(path, shape=None):
     '''
     Loads sequential time series data from a csv file and reshapes it to the given shape.
 
@@ -35,9 +35,13 @@ def load_sequential_time_series(path, shape):
         - loaded_generated_data: np.array, array containing the time series data with shape (n_samples, seq_len, n_features)
     '''
 
-    no, seq_len, dim = shape
     loaded_generated_data = np.loadtxt(path, delimiter=',')
-    loaded_generated_data = loaded_generated_data.reshape(no, seq_len, dim)
+
+    if shape:
+        no, seq_len, dim = shape
+        return loaded_generated_data.reshape(no, seq_len, dim)
+    
+    return loaded_generated_data
 
 
 def plot_time_series_attribute(df: pd.DataFrame, title='Time Series', x='Date', y='Close'):
