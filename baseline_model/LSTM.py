@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-from copy import deepcopy as dc
-from sklearn.preprocessing import MinMaxScaler
 
 class LSTM(nn.Module):
     def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
@@ -146,56 +144,6 @@ def train_model(
 
 
 ### DATA PREPROCESSING ###
-
-
-def scale_data(data, scale_prices_together=False):
-    '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
-
-    np_array = dc(data)
-    
-    _, _, no_features = np_array.shape
-    scalers = []
-
-    if scale_prices_together:
-        for i in range(no_features)
-
-    # scale each feature individually and save the scalers to inverse scale the data later
-    for i in range(no_features):
-        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
-        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
-
-    return np_array, scalers[0]
-
-
-def inverse_scale_data(np_array, scaler, seq_len):
-    '''Inverse scales the data using the given scaler and returns the inverse scaled numpy array.'''
-    # create dummies to match the required shape of the scaler and set the first column to the array to scale
-    dummies = np.zeros((np_array.shape[0], seq_len))
-    dummies[:, 0] = np_array.flatten()
-
-    # inverse scale the data
-    dummies_scaled = scaler.inverse_transform(dummies)
-
-    # get only first column of the dummies_scaled array, since this is where the original data was
-    np_array = dc(dummies_scaled[:, 0])
-
-    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
-    return np_array
-
-
-def scale_data_same_scaler(np_array, scaler):
-    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
-    n_samples = np_array.shape[0]  
-    n_timesteps = np_array.shape[1]
-
-    np_array = np_array.reshape(-1, 2)
-
-    np_array = scaler.fit_transform(np_array)
-    
-    np_array = np_array.reshape(n_samples, n_timesteps, 2)
-
-    return np_array
-
 
 def train_test_split_to_tensor(np_array, split_ratio=0.95):
     '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''

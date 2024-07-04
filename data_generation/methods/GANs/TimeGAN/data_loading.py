@@ -20,8 +20,15 @@ data_loading.py
   - energy_data: http://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
 """
 
+import os
+import sys
+
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), '../../../../'))
+sys.path.insert(0, parent_dir)
+
 ## Necessary Packages
 import numpy as np
+from utilities import scale_data
 
 
 def MinMaxScaler(data):

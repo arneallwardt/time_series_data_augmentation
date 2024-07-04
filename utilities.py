@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from copy import deepcopy as dc
+from sklearn.preprocessing import MinMaxScaler
 
 
 ### DATA VISUALIZATION ###
@@ -117,6 +119,90 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 
 ### GENERAL DATA PREPROCESSING ###
+
+
+def scale_data(data, scale_prices_together=False):
+    '''
+    Scales data using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the (closing) price.
+    
+    Args:
+        - data: numpy array of shape (n_samples, n_timesteps, n_features)
+        - scale_prices_together: if True, scales the closing price and volume together, otherwise scales each feature individually
+
+    Returns:
+        - np_array: scaled numpy array
+        - scaler: first scaler, used to scale the (closing) price feature(s)
+    '''
+
+    np_array = dc(data)
+    
+    no_samples, seq_len, no_features = np_array.shape
+    scalers = []
+
+    if scale_prices_together:
+        # create scalers
+        price_scaler = MinMaxScaler(feature_range=(0, 1))
+        volume_scaler = MinMaxScaler(feature_range=(0, 1))
+
+        # reshape to 2D array to scale all prices together
+        prices = np_array[:, :, :-1].reshape(no_samples, seq_len * (no_features-1))
+        volume = np_array[:, :, -1]
+        print(f'Shape of original array: {np_array.shape}')
+        print(f'Shape of prices: {np_array[:, :, :-1].shape}')
+        print(f'Shape of volume: {np_array[:, :, -1].shape}')
+        print(f'Shape of reshaped prices: {prices.shape}')
+        print(f'Shape of reshaped volume: {volume.shape}')
+
+        # scale prices and volume together and reshape back to 3D array
+        prices_scaled = price_scaler.fit_transform(prices)
+        volume_scaled = volume_scaler.fit_transform(volume)
+        np_array[:, :, :-1] = prices_scaled.reshape(no_samples, seq_len, no_features-1)
+        np_array[:, :, -1] = volume_scaled
+
+        # add scalers to list
+        scalers.append(price_scaler)
+        scalers.append(volume_scaler)
+
+        return np_array, price_scaler
+    
+
+    # Otherwise, scale each feature individually
+    for i in range(no_features):
+        print('Scaling individual features')
+        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
+        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
+
+    return np_array, scalers[0]
+
+
+def inverse_scale_data(np_array, scaler, seq_len):
+    '''Inverse scales the data using the given scaler and returns the inverse scaled numpy array.'''
+    # create dummies to match the required shape of the scaler and set the first column to the array to scale
+    dummies = np.zeros((np_array.shape[0], seq_len))
+    dummies[:, 0] = np_array.flatten()
+
+    # inverse scale the data
+    dummies_scaled = scaler.inverse_transform(dummies)
+
+    # get only first column of the dummies_scaled array, since this is where the original data was
+    np_array = dc(dummies_scaled[:, 0])
+
+    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
+    return np_array
+
+
+def scale_data_same_scaler(np_array, scaler):
+    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
+    n_samples = np_array.shape[0]  
+    n_timesteps = np_array.shape[1]
+
+    np_array = np_array.reshape(-1, 2)
+
+    np_array = scaler.fit_transform(np_array)
+    
+    np_array = np_array.reshape(n_samples, n_timesteps, 2)
+
+    return np_array
 
 def split_data_into_sequences(data, seq_len, shuffle_data=False):
     '''
