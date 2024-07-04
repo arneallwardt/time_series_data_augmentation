@@ -148,16 +148,19 @@ def train_model(
 ### DATA PREPROCESSING ###
 
 
-def scale_data(data):
+def scale_data(data, scale_prices_together=False):
     '''Scales each feature individually using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the closing price.'''
 
     np_array = dc(data)
     
-    n_features_per_timestep = np_array.shape[-1]
+    _, _, no_features = np_array.shape
     scalers = []
 
+    if scale_prices_together:
+        for i in range(no_features)
+
     # scale each feature individually and save the scalers to inverse scale the data later
-    for i in range(n_features_per_timestep):
+    for i in range(no_features):
         scalers.append(MinMaxScaler(feature_range=(0, 1))) 
         np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
 

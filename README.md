@@ -9,7 +9,7 @@ Already existing implementations of the following models were used and evaluated
 ## Data Format
 ### Real Data
 - **Close, Open, High, Low, Adj Close, Volume, (Date)**
-- Close is ALWAYS the first column
+- Close is ALWAYS the **first column** and Volume is ALWAYS the **last column**
 
 ### Sequential Data
 - Shape: **(num_samples, seq_len, num_features)**

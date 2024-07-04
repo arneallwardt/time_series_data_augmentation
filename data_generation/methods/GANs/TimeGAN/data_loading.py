@@ -100,7 +100,7 @@ def real_data_loading (data_name, seq_len):
   # Flip the data to make chronological data
   # ori_data = ori_data[::-1]
   # Normalize the data
-  #ori_data = MinMaxScaler(ori_data)
+  ori_data = MinMaxScaler(ori_data)
 
     
   # Preprocess the dataset
