@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -22,7 +23,9 @@ def load_complete_time_series(path):
     '''
 
     df = pd.read_csv(path)
-    df['Date'] = pd.to_datetime(df['Date'])
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+
     return df
 
 def load_sequential_time_series(path, shape=None):
@@ -118,88 +121,44 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
     return df_sliced
 
 
+
 ### GENERAL DATA PREPROCESSING ###
 
+def train_test_split(data, split_ratio=0.95):
+    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
 
-def scale_data(data: np.array):
+    split_index = int(data.shape[0] * split_ratio)
+
+    train_data = data[:split_index, :]
+    test_data = data[split_index:, :]
+
+    return train_data, test_data
+
+
+def extract_features_and_target(train_data, test_data=None):
     '''
-    Scales data using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the price features.
+    Extracts the features and target from the given data.
 
     Args:
-        - data: numpy array of shape (no_samples, seq_len, no_features) OR (no_samples, no_features). IMPORTANT: The first feature has to be the closing price and the last feature has to be the volume.
+        - train_data: np.array, data of the training set with shape (n_samples, seq_len, n_features)
+        - test_data: np.array, data of the test set with shape (n_samples, seq_len, n_features)
 
     Returns:
-        - np_array: scaled numpy array
-        - scaler: first scaler, used to scale the price feature
+        - X_train, y_train, (X_test, y_test):  torch.tensor, features and targets
     '''
 
-    if not isinstance(data, np.ndarray):
-        raise ValueError('Data is not a numpy array.')
+    X_train = torch.tensor(train_data[:, :-1, :], dtype=torch.float32)
+    y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
-    dc_data = dc(data)
-    is_sequential = dc_data.ndim == 3 # check whether or not the sequential or original data is given
+    if test_data is None:
+        print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
+        return X_train, y_train
 
-    # create scalers
-    scalers = []
-    price_scaler = MinMaxScaler(feature_range=(0, 1))
-    volume_scaler = MinMaxScaler(feature_range=(0, 1))
+    X_test = torch.tensor(test_data[:, :-1, :], dtype=torch.float32)
+    y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
-    prices, volume = __get_prices_and_volume(dc_data, is_sequential)
-
-    prices_scaled = price_scaler.fit_transform(prices)
-    volume_scaled = volume_scaler.fit_transform(volume)
-
-    dc_data = __reconstruct_original_array(dc_data, prices_scaled, volume_scaled, is_sequential)
-
-    # add scalers to list
-    scalers.append(price_scaler)
-    scalers.append(volume_scaler)
-
-    return dc_data, price_scaler
-
-
-def __get_prices_and_volume(data, is_sequential):
-    '''Returns the closing prices and volume of the given numpy array.'''
-    if is_sequential:
-        # reshape to 2D array to scale all prices together
-        no_samples, seq_len, no_features = data.shape
-        prices = data[:, :, :-1].reshape(no_samples, seq_len * (no_features-1))
-        volume = data[:, :, -1]
-    else:
-        prices = data[:, :-1]
-        volume = data[:, -1].reshape(-1, 1) # reshape to 2D array to scale later
-
-    return prices, volume
-
-
-def __reconstruct_original_array(data, prices_scaled, volume_scaled, is_sequential):
-    '''Reconstructs the original numpy array with the scaled prices and volume.'''
-    if is_sequential:
-        # reshape back to 3D array
-        no_samples, seq_len, no_features = data.shape
-        data[:, :, :-1] = prices_scaled.reshape(no_samples, seq_len, no_features-1)
-        data[:, :, -1] = volume_scaled
-    else:
-        data[:, :-1] = prices_scaled
-        data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
-
-    return data
-
-
-def inverse_scale_data(np_array, scaler, seq_len):
-    '''Inverse scales the data using the given scaler and returns the inverse scaled numpy array.'''
-    # create dummies to match the required shape of the scaler and set the first column to the array to scale
-    dummies = np.zeros((np_array.shape[0], seq_len))
-    dummies[:, 0] = np_array.flatten()
-
-    # inverse scale the data
-    dummies_scaled = scaler.inverse_transform(dummies)
-
-    # get only first column of the dummies_scaled array, since this is where the original data was
-    np_array = dc(dummies_scaled[:, 0])
-
-    print(f'Shape of the inverse scaled numpy array: {np_array.shape}')
-    return np_array
+    print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
+    return X_train, y_train, X_test, y_test
 
 
 def split_data_into_sequences(data, seq_len, shuffle_data=False):
@@ -245,3 +204,110 @@ def reconstruct_sequential_data(data):
     '''
 
     return data[:, -1, :]
+
+
+
+### Scaler Class ###
+class Scaler:
+    '''
+    Class for scaling and inverse scaling data using MinMaxScaler. 
+    NOTE: The first feature of the data has to be the closing price and the last feature has to be the volume.
+    '''
+
+    def __init__(self, data: np.array):
+        FEATURE_RANGE = (0, 1)
+
+        # NOTE: MinMaxScaler scales data individually for each column
+        # -> [[-1, 2], [-0.5, 6], [0, 10], [1, 18]] -> [[0, 0], [0.25, 0.25], [0.5, 0.5], [1, 1]]
+        self.price_scaler = MinMaxScaler(feature_range=FEATURE_RANGE)
+        self.volume_scaler = MinMaxScaler(feature_range=FEATURE_RANGE)
+
+        self.__fit_data(data)
+
+
+    def __fit_data(self, data):
+
+        if not isinstance(data, np.ndarray):
+            raise ValueError('Data is not a numpy array.')
+
+        dc_data = dc(data)
+        prices, volume = self.__get_prices_and_volume(dc_data)
+
+        self.price_scaler.fit(prices)
+        self.volume_scaler.fit(volume)
+
+
+    def scale_data(self, data):
+        '''
+        Scales data using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the price features.
+
+        Args:
+            - data: numpy array of shape (no_samples, no_features).
+
+        Returns:
+            - np_array: scaled numpy array of shape (no_samples, no_features).
+        '''
+
+        if not isinstance(data, np.ndarray):
+            raise ValueError('Data is not a numpy array.')
+
+        dc_data = dc(data)
+        prices, volume = self.__get_prices_and_volume(dc_data)
+
+        prices_scaled = self.price_scaler.transform(prices)
+        volume_scaled = self.volume_scaler.transform(volume)
+
+        scaled_data = self.__reconstruct_original_shape(dc_data, prices_scaled, volume_scaled)
+
+        return scaled_data
+
+
+    def __get_prices_and_volume(self, data):
+        '''Returns the closing prices and volume of the given numpy array.'''
+
+        prices = data[:, :-1].reshape(-1, 1) # reshape to get 1 column for all price features, otherwise each feature gets scaled individually 
+        volume = data[:, -1].reshape(-1, 1)
+
+        return prices, volume
+
+
+    def __reconstruct_original_shape(self, data, prices_scaled, volume_scaled):
+        '''Reconstructs the original numpy array with the scaled prices and volume.'''
+
+        _, no_features = data.shape
+
+        data[:, :-1] = prices_scaled.reshape(-1, no_features-1)
+        data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
+
+        return data
+
+
+    def inverse_scale_data(self, data, feature_type):
+        '''
+        Inverse scales the data using the given scaler and returns the inverse scaled numpy array.
+        
+        Args:
+            - data: numpy array of shape (no_samples, no_features).
+            - feature_type: str, either 'price' or 'volume'
+
+        Returns:
+            - scaled_data: numpy array of shape (no_samples, 1).
+        '''
+
+        if not isinstance(data, np.ndarray):
+            raise ValueError('Data is not a numpy array.')
+
+        # create dummies to match the required shape of the scaler and set the first column to the array to scale
+        dummies = np.zeros((data.shape[0], 1))
+        dummies[:, 0] = data.flatten()
+
+        # inverse scale the data
+        if feature_type == 'price':
+            dummies_scaled = self.price_scaler.inverse_transform(dummies)
+        elif feature_type == 'volume':
+            dummies_scaled = self.volume_scaler.inverse_transform(dummies)
+
+        # get only first column of the dummies_scaled array, since this is where the original data was
+        scaled_data = dummies_scaled[:, 0]
+
+        return scaled_data

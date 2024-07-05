@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import pandas as pd
 
 class LSTM(nn.Module):
     def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
@@ -140,30 +139,3 @@ def train_model(
         print(f'*' * 50) if verbose else None
 
     return best_validation_loss, model
-
-
-
-### DATA PREPROCESSING ###
-
-def train_test_split_to_tensor(np_array, split_ratio=0.95):
-    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
-
-    X = np_array[:, :-1]
-    X = torch.tensor(X, dtype=torch.float32)
-    y = np_array[:, -1, 0] # only take the closing price as target, ignore the other features
-    y = torch.tensor(y, dtype=torch.float32)
-
-    # for TSTR, TRTS
-    if split_ratio == -1:
-        return X, y
-
-    split_index = int(len(X) * split_ratio)
-
-    X_train = X[:split_index]
-    X_test = X[split_index:]
-
-    y_train = y[:split_index].unsqueeze(1)
-    y_test = y[split_index:].unsqueeze(1)
-
-    print(f'Shape of X_train: {X_train.shape} \n Shape of y_train: {y_train.shape} \n Shape of X_test: {X_test.shape} \n Shape of y_test: {y_test.shape}')
-    return X_train, y_train, X_test, y_test
