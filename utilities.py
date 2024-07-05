@@ -121,58 +121,69 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 ### GENERAL DATA PREPROCESSING ###
 
 
-def scale_data(data, scale_prices_together=False):
+def scale_data(data: np.array):
     '''
-    Scales data using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the (closing) price.
-    
+    Scales data using MinMaxScaler and returns the scaled numpy array aswell as the scaler used for scaling the price features.
+
     Args:
-        - data: numpy array of shape (n_samples, n_timesteps, n_features)
-        - scale_prices_together: if True, scales the closing price and volume together, otherwise scales each feature individually
+        - data: numpy array of shape (no_samples, seq_len, no_features) OR (no_samples, no_features). IMPORTANT: The first feature has to be the closing price and the last feature has to be the volume.
 
     Returns:
         - np_array: scaled numpy array
-        - scaler: first scaler, used to scale the (closing) price feature(s)
+        - scaler: first scaler, used to scale the price feature
     '''
 
-    np_array = dc(data)
-    
-    no_samples, seq_len, no_features = np_array.shape
+    if not isinstance(data, np.ndarray):
+        raise ValueError('Data is not a numpy array.')
+
+    dc_data = dc(data)
+    is_sequential = dc_data.ndim == 3 # check whether or not the sequential or original data is given
+
+    # create scalers
     scalers = []
+    price_scaler = MinMaxScaler(feature_range=(0, 1))
+    volume_scaler = MinMaxScaler(feature_range=(0, 1))
 
-    if scale_prices_together:
-        # create scalers
-        price_scaler = MinMaxScaler(feature_range=(0, 1))
-        volume_scaler = MinMaxScaler(feature_range=(0, 1))
+    prices, volume = __get_prices_and_volume(dc_data, is_sequential)
 
+    prices_scaled = price_scaler.fit_transform(prices)
+    volume_scaled = volume_scaler.fit_transform(volume)
+
+    dc_data = __reconstruct_original_array(dc_data, prices_scaled, volume_scaled, is_sequential)
+
+    # add scalers to list
+    scalers.append(price_scaler)
+    scalers.append(volume_scaler)
+
+    return dc_data, price_scaler
+
+
+def __get_prices_and_volume(data, is_sequential):
+    '''Returns the closing prices and volume of the given numpy array.'''
+    if is_sequential:
         # reshape to 2D array to scale all prices together
-        prices = np_array[:, :, :-1].reshape(no_samples, seq_len * (no_features-1))
-        volume = np_array[:, :, -1]
-        print(f'Shape of original array: {np_array.shape}')
-        print(f'Shape of prices: {np_array[:, :, :-1].shape}')
-        print(f'Shape of volume: {np_array[:, :, -1].shape}')
-        print(f'Shape of reshaped prices: {prices.shape}')
-        print(f'Shape of reshaped volume: {volume.shape}')
+        no_samples, seq_len, no_features = data.shape
+        prices = data[:, :, :-1].reshape(no_samples, seq_len * (no_features-1))
+        volume = data[:, :, -1]
+    else:
+        prices = data[:, :-1]
+        volume = data[:, -1].reshape(-1, 1) # reshape to 2D array to scale later
 
-        # scale prices and volume together and reshape back to 3D array
-        prices_scaled = price_scaler.fit_transform(prices)
-        volume_scaled = volume_scaler.fit_transform(volume)
-        np_array[:, :, :-1] = prices_scaled.reshape(no_samples, seq_len, no_features-1)
-        np_array[:, :, -1] = volume_scaled
+    return prices, volume
 
-        # add scalers to list
-        scalers.append(price_scaler)
-        scalers.append(volume_scaler)
 
-        return np_array, price_scaler
-    
+def __reconstruct_original_array(data, prices_scaled, volume_scaled, is_sequential):
+    '''Reconstructs the original numpy array with the scaled prices and volume.'''
+    if is_sequential:
+        # reshape back to 3D array
+        no_samples, seq_len, no_features = data.shape
+        data[:, :, :-1] = prices_scaled.reshape(no_samples, seq_len, no_features-1)
+        data[:, :, -1] = volume_scaled
+    else:
+        data[:, :-1] = prices_scaled
+        data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
 
-    # Otherwise, scale each feature individually
-    for i in range(no_features):
-        print('Scaling individual features')
-        scalers.append(MinMaxScaler(feature_range=(0, 1))) 
-        np_array[:, :, i] = scalers[i].fit_transform(np_array[:, :, i])
-
-    return np_array, scalers[0]
+    return data
 
 
 def inverse_scale_data(np_array, scaler, seq_len):
@@ -191,19 +202,6 @@ def inverse_scale_data(np_array, scaler, seq_len):
     return np_array
 
 
-def scale_data_same_scaler(np_array, scaler):
-    '''CURRENTLY NOT IN USE: Scales features together using the given scaler and returns the scaled numpy array.'''
-    n_samples = np_array.shape[0]  
-    n_timesteps = np_array.shape[1]
-
-    np_array = np_array.reshape(-1, 2)
-
-    np_array = scaler.fit_transform(np_array)
-    
-    np_array = np_array.reshape(n_samples, n_timesteps, 2)
-
-    return np_array
-
 def split_data_into_sequences(data, seq_len, shuffle_data=False):
     '''
     Splits data into sequences of length seq_len.
@@ -218,13 +216,14 @@ def split_data_into_sequences(data, seq_len, shuffle_data=False):
             -> 01.01.2021, 02.01.2021, 03.01.2021, 04.01.2021, 05.01.2021, ...
     '''
 
-    # drop Date column if it exists
-    if isinstance(data, pd.DataFrame) and 'Date' in data.columns:
-        data = data.drop(columns=['Date'])
+    if not isinstance(data, np.ndarray):
+        raise ValueError('Data is not a numpy array.')
+
+    dc_data = dc(data)
     
     split_data = []
-    for i in range(len(data)-seq_len):
-        split_data.append(data[i:i+seq_len])
+    for i in range(len(dc_data)-seq_len):
+        split_data.append(dc_data[i:i+seq_len])
 
     if shuffle_data:
         split_data = np.array(split_data)
