@@ -4,18 +4,32 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from baseline_model.LSTM import LSTM, train_model, scale_data, train_test_split_to_tensor, inverse_scale_data
+from baseline_model.LSTM import LSTM, train_model
+from utilities import Scaler, train_test_split, extract_features_and_targets, split_data_into_sequences
 from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
-def predictive_evaluation(data_real_split, data_syn_split, hyperparameters, verbose=True):
+def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, verbose=True):
 
     EVALUATION_RUNS = 10
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    _, seq_len, dim = data_real_split.shape
-
     results = pd.DataFrame(columns=['Model', 'Metric', 'Error'])
 
     ### Data Preprocessing
+
+    # Scale data
+    scaler_real = Scaler(data_real)
+    scaler_syn = Scaler(data_syn)
+
+    # Split data 
+    
+
+
+
+
+
+
+
+
 
     # save unscaled targets for evaluation later on
     _, y_real_unscaled = train_test_split_to_tensor(data_real_split, split_ratio=-1)

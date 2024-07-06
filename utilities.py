@@ -135,7 +135,7 @@ def train_test_split(data, split_ratio=0.95):
     return train_data, test_data
 
 
-def extract_features_and_target(train_data, test_data=None):
+def extract_features_and_targets(train_data, test_data=None):
     '''
     Extracts the features and target from the given data.
 
