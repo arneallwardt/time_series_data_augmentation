@@ -124,18 +124,26 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 ### GENERAL DATA PREPROCESSING ###
 
-def train_test_split(data, split_ratio=0.95):
+def train_test_split(data, split_ratio=0.95, shuffle_data=False):
     '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
 
-    split_index = int(data.shape[0] * split_ratio)
+    if not isinstance(data, np.ndarray):
+        raise ValueError('Data is not a numpy array.')
+    
+    data_dc = dc(data)
 
-    train_data = data[:split_index, :]
-    test_data = data[split_index:, :]
+    split_index = int(data_dc.shape[0] * split_ratio)
+
+    if shuffle_data:
+        np.random.shuffle(data_dc)
+
+    train_data = data_dc[:split_index, :]
+    test_data = data_dc[split_index:, :]
 
     return train_data, test_data
 
 
-def extract_features_and_targets(train_data, test_data=None):
+def extract_features_and_targets(train_data, test_data=None, val_data=None):
     '''
     Extracts the features and target from the given data.
 
@@ -150,6 +158,7 @@ def extract_features_and_targets(train_data, test_data=None):
     X_train = torch.tensor(train_data[:, :-1, :], dtype=torch.float32)
     y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
+    # return training data
     if test_data is None:
         print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
         return X_train, y_train
@@ -157,8 +166,16 @@ def extract_features_and_targets(train_data, test_data=None):
     X_test = torch.tensor(test_data[:, :-1, :], dtype=torch.float32)
     y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
-    print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
-    return X_train, y_train, X_test, y_test
+    # return training and test data
+    if val_data is None: 
+        print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
+        return X_train, y_train, X_test, y_test
+    
+    X_val = torch.tensor(val_data[:, :-1, :], dtype=torch.float32)
+    y_val = torch.tensor(val_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+
+    # return training, test and validation data
+    return X_train, y_train, X_test, y_test, X_val, y_val
 
 
 def split_data_into_sequences(data, seq_len, shuffle_data=False):

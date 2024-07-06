@@ -80,7 +80,7 @@ def train_one_epoch(
 
 def validate_one_epoch(
         model, 
-        test_loader, 
+        val_loader, 
         criterion, 
         device, 
         verbose=True):
@@ -91,7 +91,7 @@ def validate_one_epoch(
     running_test_loss = 0.0
 
     with torch.inference_mode():
-        for _, batch in enumerate(test_loader):
+        for _, batch in enumerate(val_loader):
             x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)
 
             test_pred = model(x_batch)
@@ -99,7 +99,7 @@ def validate_one_epoch(
             running_test_loss += test_loss.item()
 
     # log validation loss
-    avg_test_loss_across_batches = running_test_loss / len(test_loader)
+    avg_test_loss_across_batches = running_test_loss / len(val_loader)
     print(f'Validation Loss: {avg_test_loss_across_batches}') if verbose else None
     return avg_test_loss_across_batches
 
@@ -107,7 +107,7 @@ def validate_one_epoch(
 def train_model(
         model, 
         train_loader, 
-        test_loader, 
+        val_loader, 
         criterion, 
         optimizer, 
         device,
@@ -122,7 +122,7 @@ def train_model(
     for epoch in range(num_epochs):
         print(f'Epoch: {epoch + 1}') if verbose else None
         train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
-        current_validation_loss = validate_one_epoch(model, test_loader, criterion, device, verbose=verbose)
+        current_validation_loss = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
         
         # early stopping
         if current_validation_loss < best_validation_loss:

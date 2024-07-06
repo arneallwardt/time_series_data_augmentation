@@ -91,7 +91,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
         _, _ = train_model(
             model=TRTS_model,
             train_loader=real_data_loader,
-            test_loader=syn_data_loader,
+            val_loader=syn_data_loader,
             criterion=criterion_MSE,
             optimizer=TRTS_optimizer,
             device=device,
@@ -124,7 +124,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
         _, _ = train_model(
             model=TSTR_model,
             train_loader=syn_data_loader,
-            test_loader=real_data_loader,
+            val_loader=real_data_loader,
             criterion=criterion_MSE,
             optimizer=TSTR_optimizer,
             device=device,
@@ -157,7 +157,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
         _, _ = train_model(
             model=comb_model,
             train_loader=comb_data_loader_train,
-            test_loader=comb_data_loader_test,
+            val_loader=comb_data_loader_test,
             criterion=criterion_MSE,
             optimizer=comb_optimizer,
             device=device,
