@@ -181,7 +181,7 @@ def split_data_into_sequences(data, seq_len, shuffle_data=False):
     dc_data = dc(data)
     
     split_data = []
-    for i in range(len(dc_data)-seq_len):
+    for i in range(len(dc_data)-seq_len+1): # +1 to include the last possible element
         split_data.append(dc_data[i:i+seq_len])
 
     if shuffle_data:
@@ -217,6 +217,8 @@ class Scaler:
     def __init__(self, data: np.array):
         FEATURE_RANGE = (0, 1)
 
+        self.data_is_split = data.ndim == 3
+
         # NOTE: MinMaxScaler scales data individually for each column
         # -> [[-1, 2], [-0.5, 6], [0, 10], [1, 18]] -> [[0, 0], [0.25, 0.25], [0.5, 0.5], [1, 1]]
         self.price_scaler = MinMaxScaler(feature_range=FEATURE_RANGE)
@@ -231,6 +233,7 @@ class Scaler:
             raise ValueError('Data is not a numpy array.')
 
         dc_data = dc(data)
+
         prices, volume = self.__get_prices_and_volume(dc_data)
 
         self.price_scaler.fit(prices)
@@ -265,21 +268,29 @@ class Scaler:
     def __get_prices_and_volume(self, data):
         '''Returns the closing prices and volume of the given numpy array.'''
 
-        prices = data[:, :-1].reshape(-1, 1) # reshape to get 1 column for all price features, otherwise each feature gets scaled individually 
-        volume = data[:, -1].reshape(-1, 1)
+        if self.data_is_split:
+            prices = data[:, :, :-1].reshape(-1, 1)
+            volume = data[:, :, -1].reshape(-1, 1)
+        else:
+            prices = data[:, :-1].reshape(-1, 1) # reshape to get 1 column for all price features, otherwise each feature gets scaled individually 
+            volume = data[:, -1].reshape(-1, 1)
 
         return prices, volume
 
 
-    def __reconstruct_original_shape(self, data, prices_scaled, volume_scaled):
+    def __reconstruct_original_shape(self, original_data, prices_scaled, volume_scaled):
         '''Reconstructs the original numpy array with the scaled prices and volume.'''
 
-        _, no_features = data.shape
+        if self.data_is_split:
+            original_data[:, :, :-1] = prices_scaled.reshape(original_data[:, :, :-1].shape)
+            original_data[:, :, -1] = volume_scaled.reshape(original_data[:, :, -1].shape)
+        else:
+            _, no_features = original_data.shape
 
-        data[:, :-1] = prices_scaled.reshape(-1, no_features-1)
-        data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
+            original_data[:, :-1] = prices_scaled.reshape(-1, no_features-1)
+            original_data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
 
-        return data
+        return original_data
 
 
     def inverse_scale_data(self, data, feature_type):
