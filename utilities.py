@@ -124,8 +124,17 @@ def slice_years(df: pd.DataFrame, years, index='Date') -> pd.DataFrame:
 
 ### GENERAL DATA PREPROCESSING ###
 
-def train_test_split(data, split_ratio=0.95, shuffle_data=False):
-    '''Splits the data into train and test set, flips the column order of the features and converts them to tensors.'''
+def train_test_split(data, split_ratio=0.8):
+    '''
+    Splits the data into train and test set.
+    
+    Args:
+        - data: np.array, data to split with shape (n_samples, seq_len, n_features) OR (n_samples, n_features)
+        - split_ratio: float, ratio to split the data into train and test set
+
+    Returns:
+        - train_data, test_data: np.arrays of the splitted data
+    '''
 
     if not isinstance(data, np.ndarray):
         raise ValueError('Data is not a numpy array.')
@@ -134,11 +143,8 @@ def train_test_split(data, split_ratio=0.95, shuffle_data=False):
 
     split_index = int(data_dc.shape[0] * split_ratio)
 
-    if shuffle_data:
-        np.random.shuffle(data_dc)
-
-    train_data = data_dc[:split_index, :]
-    test_data = data_dc[split_index:, :]
+    train_data = data_dc[:split_index]
+    test_data = data_dc[split_index:]
 
     return train_data, test_data
 
