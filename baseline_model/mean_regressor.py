@@ -1,10 +1,11 @@
 import numpy as np
+import torch
 class MeanRegressor():
 
     def __init__(self):
         self.rng = np.random.default_rng(42)
 
-    def make_predictions(self, X):
+    def make_predictions(self, X, returns=False):
 
         '''
         Make predictions by sampling from a normal distribution with mean and standard deviation calculated from the input data
@@ -15,8 +16,14 @@ class MeanRegressor():
         Output:
             - y_pred: np.array of shape (no, seq_len) containing the mean of the target variable
         '''
-        X = X.numpy()
-        X_diff = np.diff(X[:, :, 0], axis=1) # Calculate the difference between consecutive close prices
+
+        if not isinstance(X, np.ndarray):
+            X = X.numpy()
+        
+        if returns:
+            X_diff = X[:, :, 0]
+        else:
+            X_diff = np.diff(X[:, :, 0], axis=1) # Calculate the difference between consecutive close prices
 
         # get mean and standard deviation of the differences for creating the normal distribution later on
         X_mean = np.mean(X_diff, axis=1)

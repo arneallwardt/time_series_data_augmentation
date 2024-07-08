@@ -20,8 +20,15 @@ data_loading.py
   - energy_data: http://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
 """
 
+import os
+import sys
+
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), '../../../../'))
+sys.path.insert(0, parent_dir)
+
 ## Necessary Packages
 import numpy as np
+from utilities import Scaler
 
 
 def MinMaxScaler(data):
@@ -87,18 +94,22 @@ def real_data_loading (data_name, seq_len):
   Returns:
     - data: preprocessed data.
   """  
-  assert data_name in ['stock','energy']
+  assert data_name in ['stock','energy', 'aapl']
   
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
+  elif data_name == 'aapl':
+    ori_data = np.loadtxt('../../../../data/real/AAPL_complete_no_date.csv', delimiter = ",",skiprows = 1)
     print(f'ori data shape: {ori_data.shape}')
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
         
   # Flip the data to make chronological data
-  ori_data = ori_data[::-1]
+  # ori_data = ori_data[::-1]
   # Normalize the data
-  ori_data = MinMaxScaler(ori_data)
+  # ori_data = MinMaxScaler(ori_data)
+  scaler = Scaler(ori_data)
+  ori_data = scaler.scale_data(ori_data)
 
     
   # Preprocess the dataset
@@ -109,11 +120,11 @@ def real_data_loading (data_name, seq_len):
     temp_data.append(_x)
         
   # Mix the datasets (to make it similar to i.i.d)
-  idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
-  data = []
+  # idx = np.random.permutation(len(temp_data)) # returns random permutation of temp_data indices
+  # data = []
 
   # shuffle data using the random indices
-  for i in range(len(temp_data)):
-    data.append(temp_data[idx[i]])
+  # for i in range(len(temp_data)):
+  #   data.append(temp_data[idx[i]])
     
-  return data
+  return temp_data
