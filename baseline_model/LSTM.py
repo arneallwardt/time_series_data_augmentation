@@ -116,13 +116,15 @@ def train_model(
         num_epochs=1000):
     
     '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''
-    
+
+    losses = []    
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
         print(f'Epoch: {epoch + 1}') if verbose else None
         train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
         current_validation_loss = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
+        losses.append(current_validation_loss)
         
         # early stopping
         if current_validation_loss < best_validation_loss:
@@ -138,4 +140,4 @@ def train_model(
 
         print(f'*' * 50) if verbose else None
 
-    return best_validation_loss, model
+    return losses, model

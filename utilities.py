@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy as dc
 from sklearn.preprocessing import MinMaxScaler
+import xgboost as xgb
+from typing import Dict
 
 
 ### DATA VISUALIZATION ###
@@ -345,3 +347,14 @@ class Scaler:
         scaled_data = dummies_scaled[:, 0]
 
         return scaled_data
+    
+class ValidationLossAccumulationCallback(xgb.callback.TrainingCallback):
+    def __init__(self, losses) -> None:
+        self.losses = losses
+
+    def after_iteration(
+    self, model, epoch: int, evals_log: Dict[str, dict]
+    ) -> bool:
+        """Accumulate the mae after each iteration."""
+        self.losses.append(evals_log['validation_0']['mean_absolute_error'][-1])
+        return False
