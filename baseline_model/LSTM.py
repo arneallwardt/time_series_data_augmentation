@@ -97,8 +97,8 @@ def train_one_epoch(
     for batch_index, batch in enumerate(train_loader):
         x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)  
 
-        train_pred = model(x_batch)
-        train_loss = criterion(train_pred, y_batch)
+        train_logits = model(x_batch)
+        train_loss = criterion(train_logits, y_batch)
         running_train_loss += train_loss.item()
         optimizer.zero_grad()
         train_loss.backward()
@@ -138,7 +138,7 @@ def validate_one_epoch(
             x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)
 
             test_pred = model(x_batch) # output in logits
-            
+
             test_loss = criterion(test_pred, y_batch)
             test_acc = accuracy(y_true=y_batch, y_pred=torch.round(torch.sigmoid(test_pred)))
             
@@ -151,7 +151,7 @@ def validate_one_epoch(
 
     avg_test_acc_accross_batches = running_test_acc / len(val_loader)
     print(f'Validation Accuracy: {avg_test_acc_accross_batches}') if verbose else None
-    return avg_test_loss_across_batches
+    return avg_test_loss_across_batches, avg_test_acc_accross_batches
 
 
 def train_model(
@@ -168,13 +168,15 @@ def train_model(
     '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''
 
     losses = []    
+    accs = []
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
         print(f'Epoch: {epoch + 1}') if verbose else None
         train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
-        current_validation_loss = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
+        current_validation_loss, current_validation_acc = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
         losses.append(current_validation_loss)
+        accs.append(current_validation_acc)
         
         # early stopping
         if current_validation_loss < best_validation_loss:
@@ -190,4 +192,4 @@ def train_model(
 
         print(f'*' * 50) if verbose else None
 
-    return losses, model
+    return losses, accs, model

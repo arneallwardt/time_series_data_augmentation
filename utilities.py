@@ -160,7 +160,7 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         - test_data: np.array, data of the test set with shape (n_samples, seq_len, n_features)
 
     Returns:
-        - X_train, y_train, (X_test, y_test):  torch.tensor, features and targets
+        - X_train, y_train, (X_test, y_test, X_val, y_val):  torch.tensor, features and targets
     '''
 
     X_train = torch.tensor(train_data[:, :-1, 1:], dtype=torch.float32)
@@ -233,10 +233,6 @@ def reconstruct_sequential_data(data):
 
 ### Metrics ###
 def accuracy(y_true, y_pred):
-    
-    print(f'y_pred: {y_pred}')
-    print(f'y_true: {y_true}')
-
     correct = torch.eq(y_true, y_pred).sum().item()
     acc = (correct/len(y_pred)) * 100
     return acc
