@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from baseline_model.LSTM import LSTM, train_model
+from baseline_model.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets, split_data_into_sequences
 from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
@@ -79,7 +79,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
 
         ### Train on Real, Test on Synthetic (TRTS)
 
-        TRTS_model = LSTM(
+        TRTS_model = LSTMRegression(
             device=device,
             input_size=dim,
             hidden_size=hyperparameters["hidden_size"],
@@ -112,7 +112,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
 
         ### Train on Synthetic, Test on Real (TSTR)
 
-        TSTR_model = LSTM(
+        TSTR_model = LSTMRegression(
             device=device,
             input_size=dim,
             hidden_size=hyperparameters["hidden_size"],
@@ -145,7 +145,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
 
         ### Combined Testing
 
-        comb_model = LSTM(
+        comb_model = LSTMRegression(
             device=device,
             input_size=dim,
             hidden_size=hyperparameters["hidden_size"],

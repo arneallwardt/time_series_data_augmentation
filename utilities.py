@@ -163,7 +163,7 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         - X_train, y_train, (X_test, y_test):  torch.tensor, features and targets
     '''
 
-    X_train = torch.tensor(train_data[:, :-1, :], dtype=torch.float32)
+    X_train = torch.tensor(train_data[:, :-1, 1:], dtype=torch.float32)
     y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
     # return training data
@@ -171,7 +171,7 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
         return X_train, y_train
 
-    X_test = torch.tensor(test_data[:, :-1, :], dtype=torch.float32)
+    X_test = torch.tensor(test_data[:, :-1, 1:], dtype=torch.float32)
     y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
     # return training and test data
@@ -179,7 +179,7 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
         return X_train, y_train, X_test, y_test
     
-    X_val = torch.tensor(val_data[:, :-1, :], dtype=torch.float32)
+    X_val = torch.tensor(val_data[:, :-1, 1:], dtype=torch.float32)
     y_val = torch.tensor(val_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
 
     # return training, test and validation data
@@ -231,6 +231,16 @@ def reconstruct_sequential_data(data):
     return data[:, -1, :]
 
 
+### Metrics ###
+def accuracy(y_true, y_pred):
+    
+    print(f'y_pred: {y_pred}')
+    print(f'y_true: {y_true}')
+
+    correct = torch.eq(y_true, y_pred).sum().item()
+    acc = (correct/len(y_pred)) * 100
+    return acc
+
 
 ### Scaler Class ###
 class Scaler:
@@ -240,14 +250,13 @@ class Scaler:
     '''
 
     def __init__(self, data: np.array):
-        FEATURE_RANGE = (0, 1)
-
         self.data_is_split = data.ndim == 3
 
         # NOTE: MinMaxScaler scales data individually for each column
         # -> [[-1, 2], [-0.5, 6], [0, 10], [1, 18]] -> [[0, 0], [0.25, 0.25], [0.5, 0.5], [1, 1]]
-        self.price_scaler = MinMaxScaler(feature_range=FEATURE_RANGE)
-        self.volume_scaler = MinMaxScaler(feature_range=FEATURE_RANGE)
+        self.close_scaler = MinMaxScaler(feature_range=(0, 1))
+        self.volume_scaler = MinMaxScaler(feature_range=(0, 1))
+        self.returns_scaler = MinMaxScaler(feature_range=(-1, 1))
 
         self.__fit_data(data)
 
@@ -259,10 +268,11 @@ class Scaler:
 
         dc_data = dc(data)
 
-        prices, volume = self.__get_prices_and_volume(dc_data)
+        close, volume, returns = self.__get_individual_features(dc_data)
 
-        self.price_scaler.fit(prices)
+        self.close_scaler.fit(close)
         self.volume_scaler.fit(volume)
+        self.returns_scaler.fit(returns)
 
 
     def scale_data(self, data):
@@ -280,40 +290,43 @@ class Scaler:
             raise ValueError('Data is not a numpy array.')
 
         dc_data = dc(data)
-        prices, volume = self.__get_prices_and_volume(dc_data)
+        close, volume, returns = self.__get_individual_features(dc_data)
 
-        prices_scaled = self.price_scaler.transform(prices)
+        close_scaled = self.close_scaler.transform(close)
         volume_scaled = self.volume_scaler.transform(volume)
+        returns_scaled = self.returns_scaler.transform(returns)
 
-        scaled_data = self.__reconstruct_original_shape(dc_data, prices_scaled, volume_scaled)
+        scaled_data = self.__reconstruct_original_shape(dc_data, close_scaled, volume_scaled, returns_scaled)
 
         return scaled_data
 
 
-    def __get_prices_and_volume(self, data):
+    def __get_individual_features(self, data):
         '''Returns the closing prices and volume of the given numpy array.'''
 
         if self.data_is_split:
-            prices = data[:, :, :-1].reshape(-1, 1)
-            volume = data[:, :, -1].reshape(-1, 1)
+            close = data[:, :, 1].reshape(-1, 1) 
+            volume = data[:, :, 2].reshape(-1, 1)
+            returns = data[:, :, -1].reshape(-1, 1)
         else:
-            prices = data[:, :-1].reshape(-1, 1) # reshape to get 1 column for all price features, otherwise each feature gets scaled individually 
-            volume = data[:, -1].reshape(-1, 1)
+            close = data[:, 1].reshape(-1, 1) 
+            volume = data[:, 2].reshape(-1, 1)
+            returns = data[:, -1].reshape(-1, 1)
 
-        return prices, volume
+        return close, volume, returns
 
 
-    def __reconstruct_original_shape(self, original_data, prices_scaled, volume_scaled):
+    def __reconstruct_original_shape(self, original_data, close_scaled, volume_scaled, returns_scaled):
         '''Reconstructs the original numpy array with the scaled prices and volume.'''
 
         if self.data_is_split:
-            original_data[:, :, :-1] = prices_scaled.reshape(original_data[:, :, :-1].shape)
-            original_data[:, :, -1] = volume_scaled.reshape(original_data[:, :, -1].shape)
+            original_data[:, :, 1] = close_scaled.reshape(original_data[:, :, 1].shape)
+            original_data[:, :, 2] = volume_scaled.reshape(original_data[:, :, 2].shape)
+            original_data[:, :, -1] = returns_scaled.reshape(original_data[:, :, -1].shape)
         else:
-            _, no_features = original_data.shape
-
-            original_data[:, :-1] = prices_scaled.reshape(-1, no_features-1)
-            original_data[:, -1] = volume_scaled.flatten() # flatten to 1D array to match the original shape
+            original_data[:, 1] = close_scaled.reshape(original_data[:, 1].shape)
+            original_data[:, 2] = volume_scaled.reshape(original_data[:, 2].shape)
+            original_data[:, -1] = returns_scaled.reshape(original_data[:, -1].shape)
 
         return original_data
 
@@ -324,7 +337,7 @@ class Scaler:
         
         Args:
             - data: numpy array of shape (no_samples, no_features).
-            - feature_type: str, either 'price' or 'volume'
+            - feature_type: str, either 'close', 'volume', 'returns
 
         Returns:
             - scaled_data: numpy array of shape (no_samples, 1).
@@ -338,10 +351,14 @@ class Scaler:
         dummies[:, 0] = data.flatten()
 
         # inverse scale the data
-        if feature_type == 'price':
-            dummies_scaled = self.price_scaler.inverse_transform(dummies)
+        if feature_type == 'close':
+            dummies_scaled = self.close_scaler.inverse_transform(dummies)
         elif feature_type == 'volume':
             dummies_scaled = self.volume_scaler.inverse_transform(dummies)
+        elif feature_type == 'returns':
+            dummies_scaled = self.returns_scaler.inverse_transform(dummies)
+        else:
+            raise ValueError('Invalid feature type. Choose either "close", "volume" or "returns".')
 
         # get only first column of the dummies_scaled array, since this is where the original data was
         scaled_data = dummies_scaled[:, 0]
