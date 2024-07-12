@@ -369,5 +369,5 @@ class ValidationLossAccumulationCallback(xgb.callback.TrainingCallback):
     self, model, epoch: int, evals_log: Dict[str, dict]
     ) -> bool:
         """Accumulate the mae after each iteration."""
-        self.losses.append(evals_log['validation_0']['mean_absolute_error'][-1])
+        self.losses.append(evals_log['validation_0']['logloss'][-1])
         return False
