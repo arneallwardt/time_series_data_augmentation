@@ -43,11 +43,11 @@ class LSTMRegression(nn.Module):
     
 
 class LSTMClassification(nn.Module):
-    def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
+    def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1, output_logits=True):
         super().__init__()
-        self.threshold = 0.5
         self.hidden_size = hidden_size
         self.num_stacked_layers = num_stacked_layers
+        self.output_logits = output_logits
         self.device = device
 
         self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True) # already includes activation layers
@@ -72,8 +72,12 @@ class LSTMClassification(nn.Module):
 
         out, _ = self.lstm(x, (h0, c0)) # get output of LSTM layer
         logits = self.fc(out[:, -1, :]) # run output through fully connected layer
-        pred = logits # apply sigmoid activation function to get probabilities
-        return pred
+
+        if self.output_logits:
+            return logits
+        
+        pred_probs = torch.sigmoid(logits) # apply sigmoid activation function to get probabilities
+        return pred_probs
     
 
 
@@ -86,10 +90,7 @@ def train_one_epoch(
         optimizer, 
         device, 
         verbose=True,
-        log_interval=100, 
-        scheduler=None):
-    
-    '''Trains the model for one epoch and returns the average training loss. If a scheduler is provided, the learning rate is updated.'''
+        log_interval=100):
     
     model.train()
     running_train_loss = 0.0
@@ -113,13 +114,7 @@ def train_one_epoch(
             
             # log training loss 
             avg_train_loss_across_batches = running_train_loss / log_interval
-
-            # update learning rate
-            if(scheduler is not None):
-                current_learning_rate = scheduler.get_last_lr()
-                scheduler.step(avg_train_loss_across_batches)
-                if current_learning_rate != scheduler.get_last_lr():
-                    print(f'INFO: Scheduler updated Learning rate from ${current_learning_rate} to {scheduler.get_last_lr()}') if verbose else None
+            # print(f'Training Loss: {avg_train_loss_across_batches}') if verbose else None
 
             total_train_loss += running_train_loss
             running_train_loss = 0.0 # reset running loss
@@ -171,7 +166,7 @@ def train_model(
         optimizer, 
         device,
         verbose=True,
-        patience=20, 
+        patience=10, 
         num_epochs=1000):
     
     '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''
@@ -184,10 +179,10 @@ def train_model(
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
         print(f'Epoch: {epoch + 1}') if verbose else None
-        curretn_train_loss, current_train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
+        current_train_loss, current_train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
         current_validation_loss, current_validation_acc = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
 
-        train_losses.append(curretn_train_loss)
+        train_losses.append(current_train_loss)
         train_accs.append(current_train_acc)
         val_losses.append(current_validation_loss)
         val_accs.append(current_validation_acc)
