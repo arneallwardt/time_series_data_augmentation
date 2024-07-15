@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from utilities import accuracy
+from copy import deepcopy as dc
 
 
 class LSTMRegression(nn.Module):
@@ -21,57 +22,78 @@ class LSTMRegression(nn.Module):
         self.fc = nn.Linear(hidden_size, 1) # fully connected layer with output = 1
 
     def forward(self, x):
-        # input has shape (batch_size, seq_len, input_size) (if batch_first=True, else (seq_len, batch_size, input_size)
-        # seq_len is the number of time steps (lookback = 7 equals 7 time steps)
-        # input_size is the number of features per time step (1 feature per time step equals input_size = 1)
+        '''
+        Args:
+            x: torch.Tensor with shape (batch_size, seq_len, input_size) (if batch_first=True, else (seq_len, batch_size, input_size))
+
+        Returns:
+            out: torch.Tensor with shape (batch_size, 1)
+        '''
 
         batch_size = x.size(0) # get batch size bc input size is 1
 
-        # initial hidden state
-        # -> remembers short term dependencies of the sequence
-        # influences the current output
         h0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
-
-        # initial cell state
-        # -> remembers long term dependencies of the sequence
-        # some of this information is passed to the next cell state which then influences the next output
         c0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
 
-        out, _ = self.lstm(x, (h0, c0)) # get output of LSTM layer
+        out, _ = self.lstm(x, (h0, c0)) 
+
         out = self.fc(out[:, -1, :]) # run output through fully connected layer
         return out
     
 
 class LSTMClassification(nn.Module):
-    def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1, output_logits=True):
+    def __init__(self, device, batch_size, input_size=1, hidden_size=4, num_stacked_layers=1, output_logits=True):
         super().__init__()
+        self.batch_size = batch_size
         self.hidden_size = hidden_size
         self.num_stacked_layers = num_stacked_layers
         self.output_logits = output_logits
         self.device = device
 
+        self.hidden = self.init_hidden(batch_size)
+
         self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True) # already includes activation layers
         self.fc = nn.Linear(hidden_size, 1) # fully connected layer with output = 1
 
+    def init_hidden(self, batch_size):
+        return (torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device),
+                torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device))
+
+
     def forward(self, x):
-        # input has shape (batch_size, seq_len, input_size) (if batch_first=True, else (seq_len, batch_size, input_size)
-        # seq_len is the number of time steps (lookback = 7 equals 7 time steps)
-        # input_size is the number of features per time step (1 feature per time step equals input_size = 1)
+        '''
+        Args:
+            x: torch.Tensor with shape (batch_size, seq_len, input_size) (if batch_first=True, else (seq_len, batch_size, input_size))
 
-        batch_size = x.size(0) # get batch size bc input size is 1
+        Returns:
+            out: torch.Tensor with shape (batch_size, 1)
+        '''
 
-        # initial hidden state
-        # -> remembers short term dependencies of the sequence
-        # influences the current output
-        h0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
+        # print(f'input shape: {x.shape}')
 
-        # initial cell state
-        # -> remembers long term dependencies of the sequence
-        # some of this information is passed to the next cell state which then influences the next output
-        c0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
+        # in case the last batch is smaller than the batch size, reset the hidden state
+        # or in case the data in production is not batched
+        batch_size = x.size(0)
+        if batch_size != self.hidden[0].size(1):
+            print('Batch size did not match')
+            self.hidden = self.init_hidden(batch_size) 
 
-        out, _ = self.lstm(x, (h0, c0)) # get output of LSTM layer
-        logits = self.fc(out[:, -1, :]) # run output through fully connected layer
+        # Forward pass through LSTM
+        out, (h0, c0) = self.lstm(x, self.hidden)
+
+        # Save the new hidden and cell state for the next forward pass
+        self.hidden = (h0.clone().detach(), c0.clone().detach())
+
+        # print(f'Hiden state shape: {h0.shape}')
+        # print(f'Hidden state: {h0}')
+        # print(f'Out passed shape: {out[:, -1, :].shape}')
+        # print(f'Out passed: {out[:, -1, :]}')
+        # print(f'Out shape: {out.shape}')
+        # print(f'Out: {out}')
+
+        # run output through fully connected layer
+        # out[:, -1, :] is essentially the last hidden state of the last layer of the LSTM
+        logits = self.fc(out[:, -1, :]) 
 
         if self.output_logits:
             return logits
@@ -107,14 +129,14 @@ def train_one_epoch(
         running_train_acc += accuracy(y_true=y_batch, y_pred=torch.round(torch.sigmoid(train_logits)))
 
         optimizer.zero_grad()
-        train_loss.backward()
+        train_loss.backward(retain_graph=True) # retain graph to access the current hidden state in the next forward pass
         optimizer.step()
 
         if batch_index % log_interval == 0:
             
             # log training loss 
             avg_train_loss_across_batches = running_train_loss / log_interval
-            # print(f'Training Loss: {avg_train_loss_across_batches}') if verbose else None
+            print(f'Training Loss: {avg_train_loss_across_batches}') if verbose else None
 
             total_train_loss += running_train_loss
             running_train_loss = 0.0 # reset running loss
