@@ -42,22 +42,24 @@ class LSTMRegression(nn.Module):
     
 
 class LSTMClassification(nn.Module):
-    def __init__(self, device, batch_size, input_size=1, hidden_size=4, num_stacked_layers=1, output_logits=True):
+    def __init__(self, device, batch_size, input_size=1, hidden_size=4, num_stacked_layers=1, bidirectional=False, output_logits=True):
         super().__init__()
         self.batch_size = batch_size
         self.hidden_size = hidden_size
         self.num_stacked_layers = num_stacked_layers
         self.output_logits = output_logits
         self.device = device
+        self.num_directions = 2 if bidirectional else 1
 
-        self.hidden = self.init_hidden(batch_size)
+        # self.hidden = self.init_hidden(batch_size)
 
-        self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True) # already includes activation layers
-        self.fc = nn.Linear(hidden_size, 1) # fully connected layer with output = 1
+        self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True, bidirectional=bidirectional) # already includes activation layers
+        self.fc = nn.Linear(hidden_size*self.num_directions, 1) # fully connected layer with output = 1
+
 
     def init_hidden(self, batch_size):
-        return (torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device),
-                torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device))
+        return (torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device),
+                torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device))
 
 
     def forward(self, x):
@@ -73,16 +75,21 @@ class LSTMClassification(nn.Module):
 
         # in case the last batch is smaller than the batch size, reset the hidden state
         # or in case the data in production is not batched
-        batch_size = x.size(0)
-        if batch_size != self.hidden[0].size(1):
-            print('Batch size did not match')
-            self.hidden = self.init_hidden(batch_size) 
+        # batch_size = x.size(0)
+        # if batch_size != self.hidden[0].size(1):
+        #     print('Batch size did not match')
+        #     self.hidden = self.init_hidden(batch_size)
+
+        batch_size = x.size(0) # get batch size bc input size is 1
+
+        h0 = torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device)
+        c0 = torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device)
 
         # Forward pass through LSTM
-        out, (h0, c0) = self.lstm(x, self.hidden)
+        out, (h0, c0) = self.lstm(x, (h0, c0))
 
         # Save the new hidden and cell state for the next forward pass
-        self.hidden = (h0.clone().detach(), c0.clone().detach())
+        # self.hidden = (h0.clone().detach(), c0.clone().detach())
 
         # print(f'Hiden state shape: {h0.shape}')
         # print(f'Hidden state: {h0}')
@@ -112,7 +119,7 @@ def train_one_epoch(
         optimizer, 
         device, 
         verbose=True,
-        log_interval=100):
+        log_interval=200):
     
     model.train()
     running_train_loss = 0.0
@@ -121,6 +128,8 @@ def train_one_epoch(
 
     for batch_index, batch in enumerate(train_loader):
         x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)  
+        
+        optimizer.zero_grad()
 
         train_logits = model(x_batch)
 
@@ -128,11 +137,13 @@ def train_one_epoch(
         running_train_loss += train_loss.item()
         running_train_acc += accuracy(y_true=y_batch, y_pred=torch.round(torch.sigmoid(train_logits)))
 
-        optimizer.zero_grad()
         train_loss.backward(retain_graph=True) # retain graph to access the current hidden state in the next forward pass
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # clip gradients to prevent exploding gradients
+
         optimizer.step()
 
-        if batch_index % log_interval == 0:
+        if batch_index % log_interval == 0 and batch_index > 0:
             
             # log training loss 
             avg_train_loss_across_batches = running_train_loss / log_interval
@@ -188,7 +199,7 @@ def train_model(
         optimizer, 
         device,
         verbose=True,
-        patience=10, 
+        patience=5, 
         num_epochs=1000):
     
     '''Trains the model and returns the best validation loss aswell as the trained model. Stops training if the validation loss does not improve for patience epochs.'''

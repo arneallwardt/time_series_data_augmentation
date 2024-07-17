@@ -245,14 +245,19 @@ class Scaler:
     NOTE: The first feature of the data has to be the closing price and the last feature has to be the volume.
     '''
 
-    def __init__(self, data: np.array):
+    def __init__(self, data: np.array, scale_features_individually=False):
         self.data_is_split = data.ndim == 3
+        self.scale_features_individually = scale_features_individually
 
-        # NOTE: MinMaxScaler scales data individually for each column
-        # -> [[-1, 2], [-0.5, 6], [0, 10], [1, 18]] -> [[0, 0], [0.25, 0.25], [0.5, 0.5], [1, 1]]
-        self.close_scaler = MinMaxScaler(feature_range=(0, 1))
-        self.volume_scaler = MinMaxScaler(feature_range=(0, 1))
-        self.returns_scaler = MinMaxScaler(feature_range=(-1, 1))
+        if scale_features_individually:
+            # NOTE: MinMaxScaler scales data individually for each column
+            # -> [[-1, 2], [-0.5, 6], [0, 10], [1, 18]] -> [[0, 0], [0.25, 0.25], [0.5, 0.5], [1, 1]]
+            self.close_scaler = MinMaxScaler(feature_range=(0, 1))
+            self.volume_scaler = MinMaxScaler(feature_range=(0, 1))
+            self.returns_scaler = MinMaxScaler(feature_range=(-1, 1))
+        else:
+            self.scaling_dimension = data.shape[1]
+            self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
 
         self.__fit_data(data)
 
@@ -264,11 +269,13 @@ class Scaler:
 
         dc_data = dc(data)
 
-        close, volume, returns = self.__get_individual_features(dc_data)
-
-        self.close_scaler.fit(close)
-        self.volume_scaler.fit(volume)
-        self.returns_scaler.fit(returns)
+        if self.scale_features_individually:
+            close, volume, returns = self.__get_individual_features(dc_data)
+            self.close_scaler.fit(close)
+            self.volume_scaler.fit(volume)
+            self.returns_scaler.fit(returns)
+        else:
+            self.universal_scaler.fit(dc_data.reshape(-1, self.scaling_dimension))
 
 
     def scale_data(self, data):
@@ -286,13 +293,19 @@ class Scaler:
             raise ValueError('Data is not a numpy array.')
 
         dc_data = dc(data)
-        close, volume, returns = self.__get_individual_features(dc_data)
 
-        close_scaled = self.close_scaler.transform(close)
-        volume_scaled = self.volume_scaler.transform(volume)
-        returns_scaled = self.returns_scaler.transform(returns)
+        if self.scale_features_individually:
+            close, volume, returns = self.__get_individual_features(dc_data)
 
-        scaled_data = self.__reconstruct_original_shape(dc_data, close_scaled, volume_scaled, returns_scaled)
+            close_scaled = self.close_scaler.transform(close)
+            volume_scaled = self.volume_scaler.transform(volume)
+            returns_scaled = self.returns_scaler.transform(returns)
+
+            scaled_data = self.__reconstruct_original_shape(dc_data, close_scaled, volume_scaled, returns_scaled)
+        else:
+            # idk if this will work for split data
+            scaled_data = self.universal_scaler.transform(dc_data.reshape(-1, self.scaling_dimension))
+            scaled_data = scaled_data.reshape(dc_data.shape)
 
         return scaled_data
 
@@ -341,23 +354,31 @@ class Scaler:
 
         if not isinstance(data, np.ndarray):
             raise ValueError('Data is not a numpy array.')
+        
+        if self.scale_features_individually:
+            # create dummies to match the required shape of the scaler and set the first column to the array to scale
+            dummies = np.zeros((data.shape[0], 1))
+            dummies[:, 0] = data.flatten()
 
-        # create dummies to match the required shape of the scaler and set the first column to the array to scale
-        dummies = np.zeros((data.shape[0], 1))
-        dummies[:, 0] = data.flatten()
+            # inverse scale the data
+            if feature_type == 'close':
+                dummies_scaled = self.close_scaler.inverse_transform(dummies)
+            elif feature_type == 'volume':
+                dummies_scaled = self.volume_scaler.inverse_transform(dummies)
+            elif feature_type == 'returns':
+                dummies_scaled = self.returns_scaler.inverse_transform(dummies)
+            else:
+                raise ValueError('Invalid feature type. Choose either "close", "volume" or "returns".')
 
-        # inverse scale the data
-        if feature_type == 'close':
-            dummies_scaled = self.close_scaler.inverse_transform(dummies)
-        elif feature_type == 'volume':
-            dummies_scaled = self.volume_scaler.inverse_transform(dummies)
-        elif feature_type == 'returns':
-            dummies_scaled = self.returns_scaler.inverse_transform(dummies)
+            # get only first column of the dummies_scaled array, since this is where the original data was
+            scaled_data = dummies_scaled[:, 0]
+
         else:
-            raise ValueError('Invalid feature type. Choose either "close", "volume" or "returns".')
-
-        # get only first column of the dummies_scaled array, since this is where the original data was
-        scaled_data = dummies_scaled[:, 0]
+            # create dummies with the required shape of the scaler using scaling_dimension
+            dummies = np.zeros((data.shape[0], self.scaling_dimension))
+            dummies[:, 0] = data.flatten()
+            dummies_scaled = self.universal_scaler.inverse_transform(dummies)
+            scaled_data = dummies_scaled[:, 0]
 
         return scaled_data
     
