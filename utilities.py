@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy as dc
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 import xgboost as xgb
 from typing import Dict
 
@@ -257,7 +257,8 @@ class Scaler:
             self.returns_scaler = MinMaxScaler(feature_range=(-1, 1))
         else:
             self.scaling_dimension = data.shape[1]
-            self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
+            # self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
+            self.universal_scaler = MaxAbsScaler()
 
         self.__fit_data(data)
 
