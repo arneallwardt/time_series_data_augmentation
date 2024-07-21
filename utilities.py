@@ -185,6 +185,40 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
     # return training, test and validation data
     return X_train, y_train, X_test, y_test, X_val, y_val
 
+def extract_features_and_targets_reg(train_data, test_data=None, val_data=None):
+    '''
+    Extracts the features and target from the given data.
+
+    Args:
+        - train_data: np.array, data of the training set with shape (n_samples, seq_len, n_features)
+        - test_data: np.array, data of the test set with shape (n_samples, seq_len, n_features)
+
+    Returns:
+        - X_train, y_train, (X_test, y_test, X_val, y_val):  torch.tensor, features and targets
+    '''
+
+    X_train = torch.tensor(train_data[:, :-1, :], dtype=torch.float32)
+    y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+
+    # return training data
+    if test_data is None:
+        print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
+        return X_train, y_train
+
+    X_test = torch.tensor(test_data[:, :-1, :], dtype=torch.float32)
+    y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+
+    # return training and test data
+    if val_data is None: 
+        print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
+        return X_train, y_train, X_test, y_test
+    
+    X_val = torch.tensor(val_data[:, :-1, :], dtype=torch.float32)
+    y_val = torch.tensor(val_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+
+    # return training, test and validation data
+    return X_train, y_train, X_test, y_test, X_val, y_val
+
 
 def split_data_into_sequences(data, seq_len, shuffle_data=False):
     '''
@@ -245,9 +279,10 @@ class Scaler:
     NOTE: The first feature of the data has to be the closing price and the last feature has to be the volume.
     '''
 
-    def __init__(self, data: np.array, scale_features_individually=False):
+    def __init__(self, data: np.array, scale_features_individually=False, no_features_to_scale=None):
         self.data_is_split = data.ndim == 3
         self.scale_features_individually = scale_features_individually
+        self.no_features_to_scale = no_features_to_scale
 
         if scale_features_individually:
             # NOTE: MinMaxScaler scales data individually for each column
@@ -276,7 +311,10 @@ class Scaler:
             self.volume_scaler.fit(volume)
             self.returns_scaler.fit(returns)
         else:
-            self.universal_scaler.fit(dc_data.reshape(-1, self.scaling_dimension))
+            if self.no_features_to_scale:
+                self.universal_scaler.fit(dc_data[:, :self.no_features_to_scale])
+            else:
+                self.universal_scaler.fit(dc_data.reshape(-1, self.scaling_dimension))
 
 
     def scale_data(self, data):
@@ -304,9 +342,14 @@ class Scaler:
 
             scaled_data = self.__reconstruct_original_shape(dc_data, close_scaled, volume_scaled, returns_scaled)
         else:
-            # idk if this will work for split data
-            scaled_data = self.universal_scaler.transform(dc_data.reshape(-1, self.scaling_dimension))
-            scaled_data = scaled_data.reshape(dc_data.shape)
+            if self.no_features_to_scale:
+                scaled_data = self.universal_scaler.transform(dc_data[:, :self.no_features_to_scale])
+                dc_data[:, :self.no_features_to_scale] = scaled_data
+                scaled_data = dc_data
+            else:
+                # idk if this will work for split data
+                scaled_data = self.universal_scaler.transform(dc_data.reshape(-1, self.scaling_dimension))
+                scaled_data = scaled_data.reshape(dc_data.shape)
 
         return scaled_data
 
@@ -375,14 +418,23 @@ class Scaler:
             scaled_data = dummies_scaled[:, 0]
 
         else:
-            # create dummies with the required shape of the scaler using scaling_dimension
-            dummies = np.zeros((data.shape[0], self.scaling_dimension))
-            dummies[:, 0] = data.flatten()
-            dummies_scaled = self.universal_scaler.inverse_transform(dummies)
-            scaled_data = dummies_scaled[:, 0]
+            if self.no_features_to_scale:
+                # create dummies to match the required shape of the scaler and set the first column to the array to scale
+                dummies = np.zeros((data.shape[0], self.no_features_to_scale))
+                dummies[:, 0] = data.flatten()
+                dummies_scaled = self.universal_scaler.inverse_transform(dummies)
+                scaled_data = dummies_scaled[:, 0]
+            else:
+                # create dummies with the required shape of the scaler using scaling_dimension
+                dummies = np.zeros((data.shape[0], self.scaling_dimension))
+                dummies[:, 0] = data.flatten()
+                dummies_scaled = self.universal_scaler.inverse_transform(dummies)
+                scaled_data = dummies_scaled[:, 0]
 
         return scaled_data
     
+
+
 class ValidationLossAccumulationCallback(xgb.callback.TrainingCallback):
     def __init__(self, losses) -> None:
         self.losses = losses
