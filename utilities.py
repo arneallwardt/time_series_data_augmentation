@@ -164,8 +164,8 @@ class Scaler:
     def __init__(self, data: np.array, no_features_to_scale=None):
         self.no_features_to_scale = no_features_to_scale if no_features_to_scale else data.shape[-1]
 
-        # self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
-        self.universal_scaler = MaxAbsScaler()
+        self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
+        # self.universal_scaler = MaxAbsScaler()
 
         self.__fit_data(data)
 
