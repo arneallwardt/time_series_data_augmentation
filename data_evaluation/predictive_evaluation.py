@@ -8,7 +8,7 @@ from baseline_model.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets, split_data_into_sequences
 from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
-def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, verbose=True):
+def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, syn_data_is_sequential, verbose=True):
 
     EVALUATION_RUNS = 10
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -32,8 +32,8 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
 
 
     # save unscaled targets for evaluation later on
-    _, y_real_unscaled = train_test_split_to_tensor(data_real_split, split_ratio=-1)
-    _, y_syn_unscaled = train_test_split_to_tensor(data_syn_split, split_ratio=-1)
+    _, y_real_unscaled = train_test_split(data_real_split, split_ratio=-1)
+    _, y_syn_unscaled = train_test_split(data_syn_split, split_ratio=-1)
 
     # scale data
     prep_data_real, scaler_real = scale_data(data_real_split)

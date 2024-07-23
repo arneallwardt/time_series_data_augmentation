@@ -5,6 +5,28 @@ from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 import xgboost as xgb
 from typing import Dict
 
+### DATA LOADING ###
+def load_sequential_time_series(path, shape=None):
+    '''
+    Loads sequential time series data from a csv file and reshapes it to the given shape.
+
+    Args:
+        - path: str, path to the csv file
+        - shape: tuple, shape of the np array to be returned in the form of (n_samples, seq_len, n_features)
+
+    Returns:
+        - loaded_generated_data: np.array, array containing the time series data with shape (n_samples, seq_len, n_features)
+    '''
+
+    loaded_generated_data = np.loadtxt(path, delimiter=',')
+
+    if shape:
+        no, seq_len, dim = shape
+        return loaded_generated_data.reshape(no, seq_len, dim)
+    
+    return loaded_generated_data
+
+
 ### GENERAL DATA PREPROCESSING ###
 
 def train_test_split(data, split_ratio=0.8):
@@ -163,6 +185,7 @@ class Scaler:
 
     def __init__(self, data: np.array, no_features_to_scale=None):
         self.no_features_to_scale = no_features_to_scale if no_features_to_scale else data.shape[-1]
+        self.data_is_split = data.ndim == 3
 
         self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
         # self.universal_scaler = MaxAbsScaler()
@@ -177,6 +200,10 @@ class Scaler:
 
         dc_data = dc(data)
 
+        # reshape to put the same features in 1 column
+        if self.data_is_split:
+            dc_data = dc_data.reshape(-1, dc_data.shape[-1])
+        
         # only scale selected first n features
         self.universal_scaler.fit(dc_data[:, :self.no_features_to_scale])
 
@@ -197,15 +224,23 @@ class Scaler:
 
         dc_data = dc(data)
 
+        # reshape to put the same features in 1 column
+        if self.data_is_split:
+            dc_data = dc_data.reshape(-1, dc_data.shape[-1])
+
         # only scale selected first n features
         scaled_data = self.universal_scaler.transform(dc_data[:, :self.no_features_to_scale]) # scale
         dc_data[:, :self.no_features_to_scale] = scaled_data # replace old data in original array
         scaled_data = dc_data # assign to new variable to return later
 
+        # reshape into original shape
+        if self.data_is_split:
+            scaled_data = scaled_data.reshape(data.shape)
+
         return scaled_data
 
 
-    def inverse_scale_data(self, data):
+    def inverse_scale_feature(self, data):
         '''
         Inverse scales the data using the given scaler and returns the inverse scaled numpy array.
         
@@ -224,6 +259,40 @@ class Scaler:
         dummies[:, :data.shape[-1]] = data
         dummies_scaled = self.universal_scaler.inverse_transform(dummies)
         scaled_data = dummies_scaled[:, :data.shape[-1]]
+
+        return scaled_data
+    
+
+    def inverse_scale_complete_dataset(self, data, data_is_split):
+        '''
+        Inverse scales the data using the given scaler and returns the inverse scaled numpy array.
+        
+        Args:
+            - data: numpy array of shape (no_samples, seq_len, no_features). Remember to watch out for the right order of features!
+            - data_is_split: bool, whether the data is split into sequences or not. 
+            NOTE: We're not using the instance attribute self.data_is_split, since we want to scale sequential data that has been scaled in original shape
+
+        Returns:
+            - scaled_data: numpy array of shape (no_samples, seq_len, no_features).
+        '''
+
+        if not isinstance(data, np.ndarray):
+            raise ValueError('Data is not a numpy array.')
+
+        dc_data = dc(data)
+
+        # reshape to put the same features in 1 column
+        if data_is_split:
+            dc_data = dc_data.reshape(-1, data.shape[-1])
+        
+        # only scale selected first n features
+        scaled_data = self.universal_scaler.inverse_transform(dc_data[:, :self.no_features_to_scale]) # scale
+        dc_data[:, :self.no_features_to_scale] = scaled_data # replace old data in original array
+        scaled_data = dc_data # assign to new variable to return later
+
+        # reshape into original shape
+        if data_is_split:
+            scaled_data = scaled_data.reshape(data.shape)
 
         return scaled_data
     
