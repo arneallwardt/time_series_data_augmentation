@@ -4,6 +4,8 @@ from copy import deepcopy as dc
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 import xgboost as xgb
 from typing import Dict
+import pandas as pd
+import os
 
 ### DATA LOADING ###
 def load_sequential_time_series(path, shape=None):
@@ -295,6 +297,33 @@ class Scaler:
             scaled_data = scaled_data.reshape(data.shape)
 
         return scaled_data
+    
+
+### inverse scaling of generated data ###
+
+def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_shape, no_features_to_inverse_scale):
+    '''
+    Inverse scales the generated data using the scaler of the original data and saves the unscaled data to a new csv file.
+
+    Args:
+        - ori_data_path: str, path to the original data
+        - scaled_data_path: str, path to the scaled data
+        - scaled_data_shape: tuple, shape of the scaled data in the form of (n_samples, seq_len, n_features)
+        - no_features_to_inverse_scale: int, number of features to inverse scale
+    '''
+
+    # load ori and data to scale
+    ori_data = pd.read_csv(ori_data_path).to_numpy()
+    scaled_seq_data = load_sequential_time_series(scaled_data_path, shape=scaled_data_shape)
+
+    inverse_scaler = Scaler(ori_data, no_features_to_scale=no_features_to_inverse_scale) # fit scaler on ori data since synthetic data was generated based on scaled ori data
+
+    inverse_scaled_data = inverse_scaler.inverse_scale_complete_dataset(scaled_seq_data, data_is_split=True) # rescale syn data
+
+    # reshape and save data
+    no, seq, dim = inverse_scaled_data.shape
+    inverse_scaled_data_reshaped = inverse_scaled_data.reshape(no, seq*dim)
+    np.savetxt(f'{os.path.splitext(scaled_data_path)[0]}_unscaled.csv', inverse_scaled_data_reshaped, delimiter=',')
     
 
 
