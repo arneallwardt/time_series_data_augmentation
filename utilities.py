@@ -187,7 +187,7 @@ class Scaler:
 
     def __init__(self, data: np.array, no_features_to_scale=None):
         self.no_features_to_scale = no_features_to_scale if no_features_to_scale else data.shape[-1]
-        self.data_is_split = data.ndim == 3
+        self.data_is_sequential = data.ndim == 3
 
         self.universal_scaler = MinMaxScaler(feature_range=(0, 1))
         # self.universal_scaler = MaxAbsScaler()
@@ -203,19 +203,21 @@ class Scaler:
         dc_data = dc(data)
 
         # reshape to put the same features in 1 column
-        if self.data_is_split:
+        if self.data_is_sequential:
             dc_data = dc_data.reshape(-1, dc_data.shape[-1])
         
         # only scale selected first n features
         self.universal_scaler.fit(dc_data[:, :self.no_features_to_scale])
 
 
-    def scale_data(self, data):
+    def scale_data(self, data, input_data_is_sequential=False):
         '''
         Scales data using specified scaler and returns the scaled numpy array aswell as the scaler used for scaling the price features.
 
         Args:
             - data: numpy array of shape (no_samples, no_features).
+            - input_data_is_split: bool, whether the input data is split into sequences or not.
+            NOTE: bool ist needed since we wnat to scale sequential data with a scaler fitted on ori data in case of TRTS
 
         Returns:
             - np_array: scaled numpy array of shape (no_samples, no_features).
@@ -227,7 +229,7 @@ class Scaler:
         dc_data = dc(data)
 
         # reshape to put the same features in 1 column
-        if self.data_is_split:
+        if self.data_is_sequential or input_data_is_sequential: 
             dc_data = dc_data.reshape(-1, dc_data.shape[-1])
 
         # only scale selected first n features
@@ -236,13 +238,13 @@ class Scaler:
         scaled_data = dc_data # assign to new variable to return later
 
         # reshape into original shape
-        if self.data_is_split:
+        if self.data_is_sequential or input_data_is_sequential:
             scaled_data = scaled_data.reshape(data.shape)
 
         return scaled_data
 
 
-    def inverse_scale_feature(self, data):
+    def inverse_scale_target(self, data):
         '''
         Inverse scales the data using the given scaler and returns the inverse scaled numpy array.
         
@@ -265,7 +267,7 @@ class Scaler:
         return scaled_data
     
 
-    def inverse_scale_complete_dataset(self, data, data_is_split):
+    def inverse_scale_complete_dataset(self, data, input_data_is_sequential):
         '''
         Inverse scales the data using the given scaler and returns the inverse scaled numpy array.
         
@@ -284,7 +286,7 @@ class Scaler:
         dc_data = dc(data)
 
         # reshape to put the same features in 1 column
-        if data_is_split:
+        if input_data_is_sequential:
             dc_data = dc_data.reshape(-1, data.shape[-1])
         
         # only scale selected first n features
@@ -293,7 +295,7 @@ class Scaler:
         scaled_data = dc_data # assign to new variable to return later
 
         # reshape into original shape
-        if data_is_split:
+        if input_data_is_sequential:
             scaled_data = scaled_data.reshape(data.shape)
 
         return scaled_data
@@ -318,7 +320,7 @@ def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_s
 
     inverse_scaler = Scaler(ori_data, no_features_to_scale=no_features_to_inverse_scale) # fit scaler on ori data since synthetic data was generated based on scaled ori data
 
-    inverse_scaled_data = inverse_scaler.inverse_scale_complete_dataset(scaled_seq_data, data_is_split=True) # rescale syn data
+    inverse_scaled_data = inverse_scaler.inverse_scale_complete_dataset(scaled_seq_data, input_data_is_sequential=True) # rescale syn data
 
     # reshape and save data
     no, seq, dim = inverse_scaled_data.shape
