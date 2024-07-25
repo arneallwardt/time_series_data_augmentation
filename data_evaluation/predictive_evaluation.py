@@ -9,7 +9,7 @@ from baseline_model.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets_reg, split_data_into_sequences
 from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
-def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, verbose=True):
+def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, baseline_only=False, verbose=True):
 
     data_real_dc = dc(data_real)
     data_syn_dc = dc(data_syn)
@@ -22,56 +22,60 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
     data_syn_is_sequential = data_syn_dc.ndim == 3
     print('Synthetic Data is sequential:', data_syn_is_sequential)
 
-    ### Baseline ###
-    baseline_train_data, baseline_test_data = train_test_split(data_real_dc, split_ratio=0.8) # split real data into train and test
-    baseline_data, baseline_scaler = get_distinct_data(train_data=baseline_train_data, test_data=baseline_test_data,
-                                                       evaluation_method='baseline',
-                                                       syn_data_is_sequential=data_syn_is_sequential,
-                                                       hyperparameters=hyperparameters)
+    if baseline_only:
+        
+        ### Baseline ###
+        baseline_train_data, baseline_test_data = train_test_split(data_real_dc, split_ratio=0.8) # split real data into train and test
+        baseline_data, baseline_scaler = get_distinct_data(train_data=baseline_train_data, test_data=baseline_test_data,
+                                                        evaluation_method='baseline',
+                                                        syn_data_is_sequential=data_syn_is_sequential,
+                                                        hyperparameters=hyperparameters)
 
-    results = run_model(data=baseline_data, scaler=baseline_scaler,
-                        evaluation_method='baseline',
-                        hyperparameters=hyperparameters,
-                        results=results,
-                        verbose=verbose)
+        results = run_model(data=baseline_data, scaler=baseline_scaler,
+                            evaluation_method='baseline',
+                            hyperparameters=hyperparameters,
+                            results=results,
+                            verbose=verbose)
 
-    ### TRTS ###
-    TRTS_data, TRTS_scaler = get_distinct_data(train_data=data_real_dc, test_data=data_syn_dc,
-                                            evaluation_method='TRTS',
-                                            syn_data_is_sequential=data_syn_is_sequential,
-                                            hyperparameters=hyperparameters)
-    
-    results = run_model(data=TRTS_data, scaler=TRTS_scaler,
-                        evaluation_method='TRTS',
-                        hyperparameters=hyperparameters,
-                        results=results, 
-                        verbose=verbose)
-    
-    
-    ### TSTR ###
-    TSTR_data, TSTR_scaler = get_distinct_data(train_data=data_syn_dc, test_data=data_real_dc,
-                                            evaluation_method='TSTR',
-                                            syn_data_is_sequential=data_syn_is_sequential,
-                                            hyperparameters=hyperparameters)
-    
-    results = run_model(data=TSTR_data, scaler=TSTR_scaler,
-                        evaluation_method='TSTR',
-                        hyperparameters=hyperparameters,
-                        results=results, 
-                        verbose=verbose)
-    
+    else:
 
-    ### Combined ###
-    combined_data, combined_scaler = get_combined_data(real_data=data_real_dc, syn_data=data_syn_dc,
-                                            syn_data_is_sequential=data_syn_is_sequential,  
-                                            hyperparameters=hyperparameters)
-    
-    results = run_model(data=combined_data, scaler=combined_scaler,
-                        evaluation_method='combined',
-                        hyperparameters=hyperparameters,
-                        results=results, 
-                        verbose=verbose)
-    
+        ### TRTS ###
+        TRTS_data, TRTS_scaler = get_distinct_data(train_data=data_real_dc, test_data=data_syn_dc,
+                                                evaluation_method='TRTS',
+                                                syn_data_is_sequential=data_syn_is_sequential,
+                                                hyperparameters=hyperparameters)
+        
+        results = run_model(data=TRTS_data, scaler=TRTS_scaler,
+                            evaluation_method='TRTS',
+                            hyperparameters=hyperparameters,
+                            results=results, 
+                            verbose=verbose)
+        
+        
+        ### TSTR ###
+        TSTR_data, TSTR_scaler = get_distinct_data(train_data=data_syn_dc, test_data=data_real_dc,
+                                                evaluation_method='TSTR',
+                                                syn_data_is_sequential=data_syn_is_sequential,
+                                                hyperparameters=hyperparameters)
+        
+        results = run_model(data=TSTR_data, scaler=TSTR_scaler,
+                            evaluation_method='TSTR',
+                            hyperparameters=hyperparameters,
+                            results=results, 
+                            verbose=verbose)
+        
+
+        ### Combined ###
+        combined_data, combined_scaler = get_combined_data(real_data=data_real_dc, syn_data=data_syn_dc,
+                                                syn_data_is_sequential=data_syn_is_sequential,  
+                                                hyperparameters=hyperparameters)
+        
+        results = run_model(data=combined_data, scaler=combined_scaler,
+                            evaluation_method='combined',
+                            hyperparameters=hyperparameters,
+                            results=results, 
+                            verbose=verbose)
+        
 
     return results
 
