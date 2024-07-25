@@ -36,4 +36,4 @@ def create_jittered_time_series(data: pd.DataFrame, jitter_factor: float, no_fea
 
     noisy_data_df = pd.DataFrame(noisy_data, columns=columns)
 
-    return noisy_data_df, noise
+    noisy_data_df.to_csv(f'jittered_data_{str(jitter_factor).replace(".", "")}.csv', index=False)
