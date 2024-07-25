@@ -99,7 +99,7 @@ def real_data_loading (data_name, seq_len):
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
   elif data_name == 'traffic':
-    ori_data = np.loadtxt('../../../data/real/metro_interstate_traffic_volume_label_encoded.csv', delimiter = ",",skiprows = 1)
+    ori_data = np.loadtxt('../../../data/real/metro_interstate_traffic_volume_label_encoded_no_categorical.csv', delimiter = ",",skiprows = 1)
     print(f'ori data shape: {ori_data.shape}')
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
@@ -108,7 +108,7 @@ def real_data_loading (data_name, seq_len):
   # ori_data = ori_data[::-1]
   # Normalize the data
   # ori_data = MinMaxScaler(ori_data)
-  scaler = Scaler(ori_data, no_features_to_scale=9)
+  scaler = Scaler(ori_data)
   ori_data = scaler.scale_data(ori_data)
 
     
