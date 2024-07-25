@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from copy import deepcopy as dc
 from torch.utils.data import DataLoader
 from baseline_model.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets_reg, split_data_into_sequences
@@ -10,54 +11,154 @@ from baseline_model.TimeSeriesDataset import TimeSeriesDataset
 
 def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, verbose=True):
 
+    data_real_dc = dc(data_real)
+    data_syn_dc = dc(data_syn)
     results = pd.DataFrame(columns=['Model', 'Metric', 'Error'])
 
     print('HYPERPARAMETERS:')
     for key, value in hyperparameters.items():
         print(key, ': ', value)
 
-    data_syn_is_sequential = data_syn.ndim == 3
+    data_syn_is_sequential = data_syn_dc.ndim == 3
     print('Synthetic Data is sequential:', data_syn_is_sequential)
 
-    # Evaluate
-    results = run_evaluation(train_data=data_real, test_data=data_syn,
-                evaluation_method='TRTS',
-                data_syn_is_sequential=data_syn_is_sequential,
-                hyperparameters=hyperparameters,
-                results=results,
-                verbose=verbose)
+    ### Baseline ###
+    baseline_train_data, baseline_test_data = train_test_split(data_real_dc, split_ratio=0.8) # split real data into train and test
+    baseline_data, baseline_scaler = get_distinct_data(train_data=baseline_train_data, test_data=baseline_test_data,
+                                                       evaluation_method='baseline',
+                                                       syn_data_is_sequential=data_syn_is_sequential,
+                                                       hyperparameters=hyperparameters)
+
+    results = run_model(data=baseline_data, scaler=baseline_scaler,
+                        evaluation_method='baseline',
+                        hyperparameters=hyperparameters,
+                        results=results,
+                        verbose=verbose)
+
+    ### TRTS ###
+    TRTS_data, TRTS_scaler = get_distinct_data(train_data=data_real_dc, test_data=data_syn_dc,
+                                            evaluation_method='TRTS',
+                                            syn_data_is_sequential=data_syn_is_sequential,
+                                            hyperparameters=hyperparameters)
     
-    results = run_evaluation(train_data=data_syn, test_data=data_real,
-                evaluation_method='TSTR',
-                data_syn_is_sequential=data_syn_is_sequential,
-                hyperparameters=hyperparameters,
-                results=results,
-                verbose=verbose)
+    results = run_model(data=TRTS_data, scaler=TRTS_scaler,
+                        evaluation_method='TRTS',
+                        hyperparameters=hyperparameters,
+                        results=results, 
+                        verbose=verbose)
     
+    
+    ### TSTR ###
+    TSTR_data, TSTR_scaler = get_distinct_data(train_data=data_syn_dc, test_data=data_real_dc,
+                                            evaluation_method='TSTR',
+                                            syn_data_is_sequential=data_syn_is_sequential,
+                                            hyperparameters=hyperparameters)
+    
+    results = run_model(data=TSTR_data, scaler=TSTR_scaler,
+                        evaluation_method='TSTR',
+                        hyperparameters=hyperparameters,
+                        results=results, 
+                        verbose=verbose)
+    
+
+    ### Combined ###
+    combined_data, combined_scaler = get_combined_data(real_data=data_real_dc, syn_data=data_syn_dc,
+                                            syn_data_is_sequential=data_syn_is_sequential,  
+                                            hyperparameters=hyperparameters)
+    
+    results = run_model(data=combined_data, scaler=combined_scaler,
+                        evaluation_method='combined',
+                        hyperparameters=hyperparameters,
+                        results=results, 
+                        verbose=verbose)
+    
+
     return results
 
 
+def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparameters):
+    # split real data (one part for train and val and one part for test)
+    real_train, real_test = train_test_split(real_data, split_ratio=0.8)
+    real_test, real_val = train_test_split(real_test, split_ratio=0.5)
+
+    # split synthetic data (only train and val)
+    syn_train, syn_val = train_test_split(syn_data, split_ratio=0.8)
+
+    ### Scale data
+    # create temporary array to fit scaler
+    # reason is, we want to scale based on real and syn data, but we can't combine real and syn data into one sequence
+    temp_train = np.concatenate((real_train, syn_train.reshape(-1, syn_train.shape[-1])), axis=0)
+
+    # create scaler
+    scaler = Scaler(temp_train, no_features_to_scale=9)
+
+    # scale data
+    real_train_scaled = scaler.scale_data(real_train)
+    real_val_scaled = scaler.scale_data(real_val)
+    real_test_scaled = scaler.scale_data(real_test)
+
+    syn_train_scaled = scaler.scale_data(syn_train, input_data_is_sequential=syn_data_is_sequential)
+    syn_val_scaled = scaler.scale_data(syn_val, input_data_is_sequential=syn_data_is_sequential)
 
 
-def run_evaluation(train_data, test_data, evaluation_method, data_syn_is_sequential, hyperparameters, results, verbose):
+    # split data into sequences
+    real_train_seq_scaled = split_data_into_sequences(real_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+    real_val_seq_scaled = split_data_into_sequences(real_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+    real_test_seq_scaled = split_data_into_sequences(real_test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+
+    if syn_data_is_sequential:
+        syn_train_seq_scaled = syn_train_scaled
+        syn_val_seq_scaled = syn_val_scaled
+    else:
+        syn_train_seq_scaled = split_data_into_sequences(syn_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        syn_val_seq_scaled = split_data_into_sequences(syn_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+
+    
+    # combine real and syn data
+    train_seq_scaled = np.concatenate((real_train_seq_scaled, syn_train_seq_scaled), axis=0)
+    val_seq_scaled = np.concatenate((real_val_seq_scaled, syn_val_seq_scaled), axis=0)
+    test_seq_scaled = real_test_seq_scaled
+
+
+    # extract features and targets
+    features_and_targets = extract_features_and_targets_reg(train_seq_scaled, test_seq_scaled, val_seq_scaled)
+
+    return features_and_targets, scaler
+
+
+def get_distinct_data(train_data, test_data, evaluation_method, syn_data_is_sequential, hyperparameters):
     
     ### Data Preprocessing
 
-    # split data into train, test, val
-    train, val = train_test_split(train_data, split_ratio=0.9)
-    test = test_data
+    # train and test split is already done, just add val data
+    if evaluation_method == 'baseline':
+        train = train_data
+        test, val = train_test_split(test_data, split_ratio=0.5)
+    else:
+        # split data into train, test, val
+        train, val = train_test_split(train_data, split_ratio=0.8)
+        test = test_data
+
 
     # scale data
     scaler = Scaler(train, no_features_to_scale=9)
     train_scaled = scaler.scale_data(train)
     val_scaled = scaler.scale_data(val)
-    test_scaled = scaler.scale_data(test, input_data_is_sequential=data_syn_is_sequential)
+    test_scaled = scaler.scale_data(test, input_data_is_sequential = test.ndim == 3)
+
+
+    # no need to be aware of sequential data as real data is always non-sequential
+    if evaluation_method == 'baseline':
+        train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+
 
     # split test data BUT split TRAINING data only if synthetic data is not sequential
-    if evaluation_method == 'TSTR':
+    elif evaluation_method == 'TSTR':
 
         # Train and val data
-        if data_syn_is_sequential:
+        if syn_data_is_sequential:
             train_seq_scaled = train_scaled
             val_seq_scaled = val_scaled
         else:
@@ -76,19 +177,21 @@ def run_evaluation(train_data, test_data, evaluation_method, data_syn_is_sequent
         val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
 
         # Test data
-        if data_syn_is_sequential:
+        if syn_data_is_sequential:
             test_seq_scaled = test_scaled # keep data as is
         else:
             test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
 
-    
-    elif evaluation_method == 'combined':
-        pass
-
 
     # extract features and targets
-    X_train, y_train, X_test, y_test, X_val, y_val = extract_features_and_targets_reg(train_seq_scaled, test_seq_scaled, val_seq_scaled)
+    features_and_targets = extract_features_and_targets_reg(train_seq_scaled, test_seq_scaled, val_seq_scaled)
 
+    return features_and_targets, scaler
+
+
+def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose):
+    # unpack data
+    X_train, y_train, X_test, y_test, X_val, y_val = data
 
     # Create Datasets and Dataloader
     train_dataset = TimeSeriesDataset(X_train, y_train)
@@ -108,7 +211,7 @@ def run_evaluation(train_data, test_data, evaluation_method, data_syn_is_sequent
         # get model and optimizer
         model = LSTMRegression(
             device=hyperparameters["device"],
-            input_size=train_data.shape[-1],
+            input_size=X_train.shape[-1],
             hidden_size=hyperparameters["hidden_size"],
             num_stacked_layers=hyperparameters["num_layers"]
         ).to(hyperparameters["device"])
@@ -141,84 +244,4 @@ def run_evaluation(train_data, test_data, evaluation_method, data_syn_is_sequent
             results = pd.concat([results, pd.DataFrame([{'Model': evaluation_method, 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
             results = pd.concat([results, pd.DataFrame([{'Model': evaluation_method, 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
 
-        return results
-
-
-def run_asdf(data_real, data_syn, data_syn_is_sequential, hyperparameters, results, verbose):
-    
-    ### Data Preprocessing
-
-    # split data into train, test, val
-    train_TRTS, val_TRTS = train_test_split(data_real, split_ratio=0.9)
-    test_TRTS = data_syn
-
-    # scale data
-    scaler_TRTS = Scaler(train_TRTS, no_features_to_scale=9)
-    train_TRTS_scaled = scaler_TRTS.scale_data(train_TRTS)
-    val_TRTS_scaled = scaler_TRTS.scale_data(val_TRTS)
-    test_TRTS_scaled = scaler_TRTS.scale_data(test_TRTS, input_data_is_sequential=data_syn_is_sequential)
-
-    # turn into sequential data
-    train_TRTS_seq_scaled = split_data_into_sequences(train_TRTS_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-    val_TRTS_seq_scaled = split_data_into_sequences(val_TRTS_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-
-    if data_syn_is_sequential:
-        test_TRTS_seq_scaled = test_TRTS_scaled # keep data as is
-    else:
-        test_TRTS_seq_scaled = split_data_into_sequences(test_TRTS_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-
-
-    # extract features and targets
-    X_train_TRTS, y_train_TRTS, X_test_TRTS, y_test_TRTS, X_val_TRTS, y_val_TRTS = extract_features_and_targets_reg(train_TRTS_seq_scaled, test_TRTS_seq_scaled, val_TRTS_seq_scaled)
-
-
-    # Create Datasets and Dataloader
-    train_dataset_TRTS = TimeSeriesDataset(X_train_TRTS, y_train_TRTS)
-    val_dataset_TRTS = TimeSeriesDataset(X_val_TRTS, y_val_TRTS)
-
-    train_loader_TRTS = DataLoader(train_dataset_TRTS, batch_size=hyperparameters["batch_size"], shuffle=False)
-    val_loader_TRTS = DataLoader(val_dataset_TRTS, batch_size=hyperparameters["batch_size"], shuffle=False)
-
-
-    ### criterion
-
-    criterion_MSE = nn.MSELoss()
-    criterion_MAE = nn.L1Loss()
-
-    for _ in tqdm(range(hyperparameters["num_evaluation_runs"])):
-
-        # get model and optimizer
-        TRTS_model = LSTMRegression(
-            device=hyperparameters["device"],
-            input_size=data_real.shape[-1],
-            hidden_size=hyperparameters["hidden_size"],
-            num_stacked_layers=hyperparameters["num_layers"]
-        ).to(hyperparameters["device"])
-        TRTS_optimizer = torch.optim.Adam(TRTS_model.parameters(), lr=hyperparameters["lr"])
-
-        # train model once
-        train_model(
-            model=TRTS_model,
-            train_loader=train_loader_TRTS,
-            val_loader=val_loader_TRTS,
-            criterion=criterion_MSE,
-            optimizer=TRTS_optimizer,
-            device=hyperparameters["device"],
-            num_epochs=hyperparameters["num_epochs"],
-            verbose=verbose
-        )
-
-        # evaluate model on test data and save results
-        with torch.inference_mode():
-            TRTS_model.eval()
-            TRTS_preds = TRTS_model(X_test_TRTS.to(hyperparameters["device"]))
-
-            # inverse scale data to get real values for error calculation
-            TRTS_preds_unscaled = torch.tensor(scaler_TRTS.inverse_scale_target(TRTS_preds.cpu().numpy().reshape(-1, 1)))
-            y_test_TRTS_unscaled = torch.tensor(scaler_TRTS.inverse_scale_target(y_test_TRTS.cpu().numpy().reshape(-1, 1)))
-
-            mae = criterion_MAE(TRTS_preds_unscaled, y_test_TRTS_unscaled).item()
-            mse = criterion_MSE(TRTS_preds_unscaled, y_test_TRTS_unscaled).item()
-
-            results = pd.concat([results, pd.DataFrame([{'Model': 'TRTS', 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
-            results = pd.concat([results, pd.DataFrame([{'Model': 'TRTS', 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
+    return results
