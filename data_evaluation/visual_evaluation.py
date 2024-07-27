@@ -102,8 +102,8 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
     data_syn = np.asarray(data_syn)  
 
     # get random samples 
-    no_samples = min([1000, len(data_real)]) # number of samples
-    sampling_indices = np.random.permutation(len(data_real))[:no_samples] # get random indices for random samples from original data (only as much as no_samples)
+    no_samples = min([1000, len(data_real), len(data_syn)]) # number of samples
+    sampling_indices = np.random.permutation(min([len(data_real), len(data_syn)]))[:no_samples] # get random indices for random samples (only as much as no_samples)
 
     data_real = data_real[sampling_indices]
     data_syn = data_syn[sampling_indices]
