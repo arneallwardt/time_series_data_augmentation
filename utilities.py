@@ -56,7 +56,7 @@ def train_test_split(data, split_ratio=0.8):
     return train_data, test_data
 
 
-def extract_features_and_targets(train_data, test_data=None, val_data=None):
+def extract_features_and_targets_clas(train_data, test_data=None, val_data=None):
     '''
     Extracts the features and target from the given data.
 
@@ -68,24 +68,24 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         - X_train, y_train, (X_test, y_test, X_val, y_val):  torch.tensor, features and targets
     '''
 
-    X_train = torch.tensor(train_data[:, :-1, 1:], dtype=torch.float32)
-    y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_train = train_data[:, :-1, :]
+    y_train = train_data[:, -1, 0].reshape(-1, 1)
 
     # return training data
     if test_data is None:
         print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
         return X_train, y_train
 
-    X_test = torch.tensor(test_data[:, :-1, 1:], dtype=torch.float32)
-    y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_test = test_data[:, :-1, :]
+    y_test = test_data[:, -1, 0].reshape(-1, 1)
 
     # return training and test data
     if val_data is None: 
         print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
         return X_train, y_train, X_test, y_test
     
-    X_val = torch.tensor(val_data[:, :-1, 1:], dtype=torch.float32)
-    y_val = torch.tensor(val_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_val = val_data[:, :-1, :]
+    y_val = val_data[:, -1, 0].reshape(-1, 1)
 
     # return training, test and validation data
     return X_train, y_train, X_test, y_test, X_val, y_val
