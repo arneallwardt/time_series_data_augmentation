@@ -196,6 +196,14 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
     # unpack data
     X_train, y_train, X_test, y_test, X_val, y_val = data
 
+    if len(X_test) > len(X_val):
+        # Limit test data to same size as validation data (for TSTR, TRTS)
+        # as we are using the entire synthetic data as test set
+        no_samples = min([len(X_val), len(X_test)])
+        sampling_indices = np.random.permutation(len(X_test))[:no_samples]
+        X_test = X_test[sampling_indices]
+        y_test = y_test[sampling_indices]
+
     # Create Datasets and Dataloader
     train_dataset = TimeSeriesDataset(X_train, y_train)
     val_dataset = TimeSeriesDataset(X_val, y_val)
