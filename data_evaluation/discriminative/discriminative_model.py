@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
 
-parent_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), '../../'))
 sys.path.insert(0, parent_dir)
 
 from utilities import accuracy

@@ -5,9 +5,9 @@ import pandas as pd
 from tqdm import tqdm
 from copy import deepcopy as dc
 from torch.utils.data import DataLoader
-from baseline_model.LSTM import LSTMRegression, train_model
+from data_evaluation.predictive.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets_reg, split_data_into_sequences
-from baseline_model.TimeSeriesDataset import TimeSeriesDataset
+from data_evaluation.predictive.TimeSeriesDataset import TimeSeriesDataset
 
 def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, include_baseline=False, verbose=True):
 
