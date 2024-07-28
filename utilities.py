@@ -348,11 +348,25 @@ def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_s
     
 
 class EvaluationDataset():
-    def __init__(self, type, data, predictive_results):
+    def __init__(self, type, data_path, predictive_results_path, data_shape=(3000, 13, 5)):
         self.type = type
-        self.data = data
-        self.predictive_results = predictive_results
+        self.discriminative_data = load_sequential_time_series(data_path, data_shape)
+        self.syn_data = self.discriminative_data[:, :-1, :]
+        self.predictive_results = pd.read_csv(predictive_results_path)
 
+    def get_specific_results(self, metric, model=None):
+
+        if model:
+            filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == model)]
+            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{model}-{self.type}')
+        else:
+            filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric)]
+
+        return filtered_df
+    
+    def get_baseline_results(self, metric):
+        filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == 'baseline')]
+        return filtered_df
 
 
 
