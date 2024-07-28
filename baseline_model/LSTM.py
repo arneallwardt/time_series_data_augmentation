@@ -12,14 +12,15 @@ from copy import deepcopy as dc
 
 
 class LSTMRegression(nn.Module):
-    def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1):
+    def __init__(self, device, input_size=1, hidden_size=4, num_stacked_layers=1, bidirectional=False):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_stacked_layers = num_stacked_layers
+        self.num_directions = 2 if bidirectional else 1
         self.device = device
 
-        self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True) # already includes activation layers
-        self.fc = nn.Linear(hidden_size, 1) # fully connected layer with output = 1
+        self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers, batch_first=True, bidirectional=bidirectional) # already includes activation layers
+        self.fc = nn.Linear(hidden_size*self.num_directions, 1) # fully connected layer with output = 1
 
     def forward(self, x):
         '''
@@ -32,8 +33,8 @@ class LSTMRegression(nn.Module):
 
         batch_size = x.size(0) # get batch size bc input size is 1
 
-        h0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
-        c0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(self.device)
+        h0 = torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device)
+        c0 = torch.zeros(self.num_stacked_layers*self.num_directions, batch_size, self.hidden_size).to(self.device)
 
         out, _ = self.lstm(x, (h0, c0)) 
 

@@ -91,6 +91,7 @@ class CNNClassification(nn.Module):
         self.conv1 = nn.Conv1d(5, 5, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv1d(5, 5, kernel_size=3, stride=1, padding=0)
         self.conv3 = nn.Conv1d(5, 5, kernel_size=4, stride=1, padding=0)
+        self.conv4 = nn.Conv1d(1, 1, kernel_size=5, stride=1, padding=0)
         self.linear = nn.Linear(5, 1)
     
     def forward(self, x):
@@ -108,11 +109,21 @@ class CNNClassification(nn.Module):
         x = F.relu(self.conv3(x))
         print(f'After conv3: {x.shape}') if self.verbose else None
 
-        x = x.view(x.size(0), 5)
+        x = x.view(x.shape[0], 1, -1)
         print(f'After view: {x.shape}') if self.verbose else None
 
-        logits = self.linear(x)
-        print(f'After linear: {logits.shape}') if self.verbose else None
+        logits = F.relu(self.conv4(x))
+        print(f'After conv4: {logits.shape}') if self.verbose else None
+
+        logits = logits.view(logits.size(0), -1)
+        print(f'After view: {logits.shape}') if self.verbose else None
+
+
+        # x = x.view(x.size(0), 5)
+        # print(f'After view: {x.shape}') if self.verbose else None
+
+        # logits = self.linear(x)
+        # print(f'After linear: {logits.shape}') if self.verbose else None
 
         if self.output_logits:
             return logits
@@ -162,6 +173,7 @@ def train_cnn(model,
         for _, (X_batch_train, y_batch_train) in enumerate(train_loader):
 
             X_batch_train = X_batch_train.float().to(hyperparameters['device'])
+            y_batch_train = y_batch_train.float().to(hyperparameters['device'])
 
             # forward pass
             pred_logits_train = model(X_batch_train)
@@ -170,11 +182,9 @@ def train_cnn(model,
             train_loss = criterion(pred_logits_train, y_batch_train)
             train_acc = accuracy(y_true=y_batch_train, y_pred=torch.round(torch.sigmoid(pred_logits_train)))
 
-            # save metrics for running average and evaluation later on
+            # save metrics for running average
             running_train_loss += train_loss.item()
             running_train_acc += train_acc
-            train_losses.append(train_loss.item())
-            train_accs.append(train_acc)
 
             # gradient descent and backprop
             optimizer.zero_grad()
@@ -191,19 +201,18 @@ def train_cnn(model,
 
             for _, (X_batch_val, y_batch_val) in enumerate(val_loader):
                 X_batch_val = X_batch_val.float().to(hyperparameters['device'])
+                y_batch_val = y_batch_val.float().to(hyperparameters['device'])
 
                 # forward pass
                 pred_logits_val = model(X_batch_val)
 
                 # get metrics
                 val_loss = criterion(pred_logits_val, y_batch_val)
-                val_acc = accuracy(y_true=y_batch_train, y_pred=torch.round(torch.sigmoid(pred_logits_train)))
+                val_acc = accuracy(y_true=y_batch_val, y_pred=torch.round(torch.sigmoid(pred_logits_val)))
 
-                # save metrics for running average and evaluation later on
+                # save metrics for running average
                 running_val_loss += val_loss.item()
                 running_val_acc += val_acc
-                val_losses.append(val_loss.item())
-                val_accs.append(val_acc)
 
 
             # Check for early stopping
@@ -218,7 +227,19 @@ def train_cnn(model,
 
         ### Logging and Plotting ###
 
-        print(f'Epoch: {epoch} \n\b Train Loss: {running_train_loss / len(train_loader)} \n\b Train Acc: {running_train_acc / len(train_loader)} \n\b Val Loss: {running_val_loss / len(val_loader)} \n\b Val Acc: {running_val_acc / len(val_loader)}')
+        # calculate average loss and accuracy across batches
+        train_loss_accross_batches = running_train_loss / len(train_loader)
+        train_acc_accross_batches = running_train_acc / len(train_loader)
+        val_loss_accross_batches = running_val_loss / len(val_loader)
+        val_acc_accross_batches = running_val_acc / len(val_loader)
+
+        # save average loss and accuracy for this epoch
+        train_losses.append(train_loss_accross_batches)
+        train_accs.append(train_acc_accross_batches)
+        val_losses.append(val_loss_accross_batches)
+        val_accs.append(val_acc_accross_batches)
+
+        print(f'Epoch: {epoch} \n\b Train Loss: {train_loss_accross_batches} \n\b Train Acc: {train_acc_accross_batches} \n\b Val Loss: {val_loss_accross_batches} \n\b Val Acc: {val_acc_accross_batches}')
         print('*' * 50)
 
         if num_epochs_no_improvement >= patience:

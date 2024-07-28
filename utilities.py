@@ -178,6 +178,25 @@ def accuracy(y_true, y_pred):
     return acc
 
 
+def get_discriminative_test_performance(model, device, test_data, method, results):
+
+    X_test, y_test = extract_features_and_targets_clas(test_data)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.float32)
+
+    with torch.inference_mode(): 
+        test_logits = model(X_test.to(device)) # get plain model output (logits)
+        test_probs = torch.sigmoid(test_logits) # get probabilities
+        test_preds = torch.round(test_probs) # get classes
+
+        test_acc = accuracy(y_true=y_test, y_pred=torch.tensor(test_preds))
+        print(test_acc)
+        
+        results = pd.concat([results, pd.DataFrame([{'Method': method, 'Accuracy': test_acc}])], ignore_index=True)
+
+    return results
+
+
 ### Scaler Class ###
 class Scaler:
     '''

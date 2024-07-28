@@ -224,7 +224,8 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
             device=hyperparameters["device"],
             input_size=X_train.shape[-1],
             hidden_size=hyperparameters["hidden_size"],
-            num_stacked_layers=hyperparameters["num_layers"]
+            num_stacked_layers=hyperparameters["num_layers"],
+            bidirectional=hyperparameters["bidirectional"],
         ).to(hyperparameters["device"])
         optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters["lr"])
 
