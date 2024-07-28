@@ -56,7 +56,7 @@ def train_test_split(data, split_ratio=0.8):
     return train_data, test_data
 
 
-def extract_features_and_targets(train_data, test_data=None, val_data=None):
+def extract_features_and_targets_clas(train_data, test_data=None, val_data=None):
     '''
     Extracts the features and target from the given data.
 
@@ -68,24 +68,24 @@ def extract_features_and_targets(train_data, test_data=None, val_data=None):
         - X_train, y_train, (X_test, y_test, X_val, y_val):  torch.tensor, features and targets
     '''
 
-    X_train = torch.tensor(train_data[:, :-1, 1:], dtype=torch.float32)
-    y_train = torch.tensor(train_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_train = train_data[:, :-1, :]
+    y_train = train_data[:, -1, 0].reshape(-1, 1)
 
     # return training data
     if test_data is None:
         print(f'Extracted features and target from training data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}')
         return X_train, y_train
 
-    X_test = torch.tensor(test_data[:, :-1, 1:], dtype=torch.float32)
-    y_test = torch.tensor(test_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_test = test_data[:, :-1, :]
+    y_test = test_data[:, -1, 0].reshape(-1, 1)
 
     # return training and test data
     if val_data is None: 
         print(f'Extracted features and target from training and test data.\nShape of X_train: {X_train.shape}\nShape of y_train: {y_train.shape}\nShape of X_test: {X_test.shape}\nShape of y_test: {y_test.shape}')
         return X_train, y_train, X_test, y_test
     
-    X_val = torch.tensor(val_data[:, :-1, 1:], dtype=torch.float32)
-    y_val = torch.tensor(val_data[:, -1, 0], dtype=torch.float32).reshape(-1, 1)
+    X_val = val_data[:, :-1, :]
+    y_val = val_data[:, -1, 0].reshape(-1, 1)
 
     # return training, test and validation data
     return X_train, y_train, X_test, y_test, X_val, y_val
@@ -176,6 +176,25 @@ def accuracy(y_true, y_pred):
     correct = torch.eq(y_true, y_pred).sum().item()
     acc = (correct/len(y_pred)) * 100
     return acc
+
+
+def get_discriminative_test_performance(model, device, test_data, method, results):
+
+    X_test, y_test = extract_features_and_targets_clas(test_data)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.float32)
+
+    with torch.inference_mode(): 
+        test_logits = model(X_test.to(device)) # get plain model output (logits)
+        test_probs = torch.sigmoid(test_logits) # get probabilities
+        test_preds = torch.round(test_probs) # get classes
+
+        test_acc = accuracy(y_true=y_test, y_pred=torch.tensor(test_preds))
+        print(test_acc)
+        
+        results = pd.concat([results, pd.DataFrame([{'Method': method, 'Accuracy': test_acc}])], ignore_index=True)
+
+    return results
 
 
 ### Scaler Class ###
