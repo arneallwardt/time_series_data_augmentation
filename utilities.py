@@ -347,6 +347,14 @@ def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_s
     np.savetxt(f'{os.path.splitext(scaled_data_path)[0]}_unscaled.csv', inverse_scaled_data_reshaped, delimiter=',')
     
 
+class EvaluationDataset():
+    def __init__(self, type, data, predictive_results):
+        self.type = type
+        self.data = data
+        self.predictive_results = predictive_results
+
+
+
 
 class ValidationLossAccumulationCallback(xgb.callback.TrainingCallback):
     def __init__(self, losses) -> None:
