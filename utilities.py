@@ -178,18 +178,21 @@ def accuracy(y_true, y_pred):
     return acc
 
 
-def get_discriminative_test_performance(model, device, test_data, method, results):
+def get_discriminative_test_performance(model, device, test_data, scaler, method, results):
 
     X_test, y_test = extract_features_and_targets_clas(test_data)
-    X_test = torch.tensor(X_test, dtype=torch.float32)
+    X_test_scaled = scaler.scale_data(X_test)
+    
+    X_test_scaled = torch.tensor(X_test_scaled, dtype=torch.float32)
     y_test = torch.tensor(y_test, dtype=torch.float32)
 
     with torch.inference_mode(): 
-        test_logits = model(X_test.to(device)) # get plain model output (logits)
+        test_logits = model(X_test_scaled.to(device)) # get plain model output (logits)
         test_probs = torch.sigmoid(test_logits) # get probabilities
         test_preds = torch.round(test_probs) # get classes
+        test_preds = test_preds.clone().detach()
 
-        test_acc = accuracy(y_true=y_test, y_pred=torch.tensor(test_preds))
+        test_acc = accuracy(y_true=y_test, y_pred=test_preds)
         print(test_acc)
         
         results = pd.concat([results, pd.DataFrame([{'Method': method, 'Accuracy': test_acc}])], ignore_index=True)
@@ -346,6 +349,31 @@ def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_s
     inverse_scaled_data_reshaped = inverse_scaled_data.reshape(no, seq*dim)
     np.savetxt(f'{os.path.splitext(scaled_data_path)[0]}_unscaled.csv', inverse_scaled_data_reshaped, delimiter=',')
     
+
+class EvaluationDataset():
+    def __init__(self, type, data_path, predictive_results_path, data_shape=(3000, 13, 5)):
+        self.type = type
+        self.discriminative_data = load_sequential_time_series(data_path, data_shape)
+        self.syn_data = self.discriminative_data[:, :-1, :]
+        self.predictive_results = pd.read_csv(predictive_results_path)
+        
+        self.pca_results = None
+        self.tsne_results = None
+
+    def get_specific_results(self, metric, model=None):
+
+        if model:
+            filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == model)]
+            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{model}-{self.type}')
+        else:
+            filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric)]
+
+        return filtered_df
+    
+    def get_baseline_results(self, metric):
+        filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == 'baseline')]
+        return filtered_df
+
 
 
 class ValidationLossAccumulationCallback(xgb.callback.TrainingCallback):

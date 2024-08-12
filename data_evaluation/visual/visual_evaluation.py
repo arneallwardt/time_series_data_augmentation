@@ -4,7 +4,7 @@ from scipy.spatial.distance import pdist, squareform
 import numpy as np
 import matplotlib.pyplot as plt
 
-### SINGLE EVALUATION METRICS
+### EVALUATION METRICS ###
 
 def maximum_mean_discrepancy(X, Y):
     '''
@@ -20,7 +20,7 @@ def maximum_mean_discrepancy(X, Y):
     return XX.mean() + YY.mean() - 2 * XY.mean()
 
 
-def pca(real, syn):
+def get_pca_results(real, syn):
     '''
     Principal Component Analysis (PCA) is a dimensionality reduction technique that can be used to reduce a large number of variables to a smaller number of variables while preserving as much variance as possible.
     It is used to visualize the data in 2D and compare the distributions of the original and synthetic data.
@@ -33,22 +33,39 @@ def pca(real, syn):
     # Fit PCA
     pca = PCA(n_components = 2)
     pca.fit(real)
+
+    print(real.shape, syn.shape)
+
     pca_real_results = pca.transform(real)
     pca_syn_results = pca.transform(syn)
 
-    # Plotting
-    f, ax = plt.subplots(1)    
-    plt.scatter(pca_real_results[:,0], pca_real_results[:,1], c='red', alpha = 0.2, label = "Original")
-    plt.scatter(pca_syn_results[:,0], pca_syn_results[:,1], c='blue', alpha = 0.2, label = "Synthetic")
+    return pca_real_results, pca_syn_results
 
-    ax.legend()  
-    plt.title('PCA plot')
-    plt.xlabel('x-pca')
-    plt.ylabel('y_pca')
+
+def plot_pca_results(pca_real_results, eval_datasets):
+    
+    num_results = len(eval_datasets)
+    f, axarr = plt.subplots(1, num_results, figsize=(5*num_results, 5))
+
+    # In case only one subplot is needed, put axarr in a list, so that it can be iterated over
+    if num_results == 1:
+        axarr = [axarr]
+
+    for i in range(num_results):
+        
+        axarr[i].scatter(pca_real_results[:,0], pca_real_results[:,1], c='red', alpha = 0.2, label = "Original")
+        axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c='blue', alpha = 0.2, label = "Synthetic")
+
+        axarr[i].legend()  
+        axarr[i].set_title(f'{eval_datasets[i].type} PCA results')
+        axarr[i].set_xlabel('x-pca')
+        axarr[i].set_ylabel('y_pca')
+
+    plt.tight_layout()
     plt.show()
 
 
-def tsne(real, syn, no_samples):
+def get_tsne_results(real, syn, no_samples):
     '''
     t-Distributed Stochastic Neighbor Embedding (t-SNE) is a dimensionality reduction technique for embedding high-dimensional data for visualization in a low-dimensional space
 
@@ -58,34 +75,72 @@ def tsne(real, syn, no_samples):
         - no_samples: int, number of samples for each synthetic and real data to be used for visualization
     '''
 
-    colors = ["red" for i in range(no_samples)] + ["blue" for i in range(no_samples)]  
-
     # Do t-SNE Analysis together       
     data_final = np.concatenate((real, syn), axis = 0)
     
     # TSNE anlaysis
     tsne = TSNE(n_components = 2, verbose = 1, perplexity = 40, n_iter = 300)
     tsne_results = tsne.fit_transform(data_final) # shape: (2*no_samples, 2)
-      
-    # Plotting
-    f, ax = plt.subplots(1)
-      
-    plt.scatter(tsne_results[:no_samples,0], tsne_results[:no_samples,1], 
-                c = colors[:no_samples], alpha = 0.2, label = "Original") # original data can be accessed by slicing the first no_samples
-    plt.scatter(tsne_results[no_samples:,0], tsne_results[no_samples:,1], 
-                c = colors[no_samples:], alpha = 0.2, label = "Synthetic") # synthetic data can be accessed by slicing the last no_samples
-  
-    ax.legend()
-      
-    plt.title('t-SNE plot')
-    plt.xlabel('x-tsne')
-    plt.ylabel('y_tsne')
-    plt.show()  
+
+    return tsne_results
+
+
+def plot_tsne_results(eval_datasets, no_samples):
+
+    colors = ["red" for _ in range(no_samples)] + ["blue" for _ in range(no_samples)]  
+
+    num_results = len(eval_datasets)
+    f, axarr = plt.subplots(1, num_results, figsize=(5*num_results, 5))
+
+    # In case only one subplot is needed, put axarr in a list, so that it can be iterated over
+    if num_results == 1:
+        axarr = [axarr]
+
+    for i in range(num_results):
+        
+        axarr[i].scatter(eval_datasets[i].tsne_results[:no_samples,0], eval_datasets[i].tsne_results[:no_samples,1], 
+                        c=colors[:no_samples], alpha=0.2, label="Original")
+        axarr[i].scatter(eval_datasets[i].tsne_results[no_samples:,0], eval_datasets[i].tsne_results[no_samples:,1], 
+                        c=colors[no_samples:], alpha=0.2, label="Synthetic")
+        
+        axarr[i].legend()
+        axarr[i].set_title(f'{eval_datasets[i].type} t-SNE results')
+        axarr[i].set_xlabel('x-tsne')
+        axarr[i].set_ylabel('y-tsne')
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+### DATA PREPROCESSING ###
+
+def get_sampling_indices(data_real, data_syn, no_samples):
+    sampling_indices = np.random.permutation(min([len(data_real), len(data_syn)]))[:no_samples] # get random indices for random samples (only as much as no_samples)
+    return sampling_indices
+
+def get_preprocessed_data(data, mean_flatten, no_samples, verbose):
+    print(f'shape of data before preprocessing: {data.shape}')
+    _, seq_len, _ = data.shape
+
+    # flatten data to be in 2 dims
+    if mean_flatten: # whether or not to use the mean of the features or original values of the features
+        for i in range(no_samples):
+            if (i == 0):
+                prep_data = np.reshape(np.mean(data[0], 1), [1,seq_len]) # get mean over features and save as array with shape (1, 24)
+            else:
+                prep_data = np.concatenate((prep_data, np.reshape(np.mean(data[i],1), [1,seq_len]))) # same as above, but append to existing array
+    else:
+        prep_data = data.reshape(no_samples, -1)
+    
+    print(f'shape of data after preprocessing: {prep_data.shape}') if verbose else None
+    return prep_data
+
 
 
 ### EVALUATION WORKFLOW
 
-def visualize(data_real, data_syn, metric, mean_flatten = False):
+def visual_evaluation(data_real, eval_datasets, no_samples=1000, mean_flatten=False, verbose=False):
     '''
     Visualizes the original and synthetic data using PCA or tSNE
 
@@ -95,44 +150,32 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
         - mean_flatten: bool, whether or not to use the mean of the features or original values of the features for evaluating
     '''
 
-    print(f'Preprocessing data. Shape: {data_real.shape}')
+    print(f'Number of datasets to evaluate: {len(eval_datasets)}') if verbose else None
 
-    ### Preprocessing 
-    data_real = np.asarray(data_real)
-    data_syn = np.asarray(data_syn)  
-
-    # get random samples 
-    no_samples = min([1000, len(data_real), len(data_syn)]) # number of samples
-    sampling_indices = np.random.permutation(min([len(data_real), len(data_syn)]))[:no_samples] # get random indices for random samples (only as much as no_samples)
-
+    # get random sampling indices
+    sampling_indices = get_sampling_indices(data_real=data_real, 
+                                            data_syn=eval_datasets[0].syn_data, 
+                                            no_samples=no_samples)
+    
+    # get permuted real data and preprocess
     data_real = data_real[sampling_indices]
-    data_syn = data_syn[sampling_indices]
+    prep_data_real = get_preprocessed_data(data_real, mean_flatten, no_samples, verbose)
 
-    # get shape of original data
-    no, seq_len, dim = data_real.shape
+    ### Apply metrics
+    for eval_dataset in eval_datasets:        
+        
+        pca_real_results, eval_dataset.pca_results = get_pca_results(real=prep_data_real,
+                                        syn=get_preprocessed_data(eval_dataset.syn_data[sampling_indices], mean_flatten, no_samples, verbose))
+        
+        eval_dataset.tsne_results = get_tsne_results(real=prep_data_real,
+                                            syn=get_preprocessed_data(eval_dataset.syn_data[sampling_indices], mean_flatten, no_samples, verbose),
+                                            no_samples=no_samples)
 
-    # flatten data to be in 2 dims
-    if mean_flatten: # whether or not to use the mean of the features or original values of the features
-        for i in range(no_samples):
-            if (i == 0):
-                prep_data_real = np.reshape(np.mean(data_real[0], 1), [1,seq_len]) # get mean over features and save as array with shape (1, 24)
-                prep_data_syn = np.reshape(np.mean(data_syn[0], 1), [1,seq_len])
-            else:
-                prep_data_real = np.concatenate((prep_data_real, 
-                                            np.reshape(np.mean(data_real[i],1), [1,seq_len]))) # same as above, but append to existing array
-                prep_data_syn = np.concatenate((prep_data_syn, 
-                                            np.reshape(np.mean(data_syn[i],1), [1,seq_len])))
-    else:
-        prep_data_real = data_real.reshape(no_samples, -1)
-        prep_data_syn = data_syn.reshape(no_samples, -1)
+    ### Plot metrics
+    plot_pca_results(pca_real_results, eval_datasets)
+    plot_tsne_results(eval_datasets, no_samples)
     
-    
-    print(f'Data has been preprocessed. Shape: {prep_data_real.shape}')
 
-    ### Apply metric
-    if metric == 'pca':
-        pca(prep_data_real, prep_data_syn)
+   
 
-    elif metric == 'tsne':
-        tsne(prep_data_real, prep_data_syn, no_samples)
     
