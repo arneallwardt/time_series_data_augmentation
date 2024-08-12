@@ -82,10 +82,12 @@ def tsne(real, syn, no_samples):
     plt.ylabel('y_tsne')
     plt.show()  
 
+def get_sampling_indices(data_real, data_syn, no_samples):
+    pass
 
 ### EVALUATION WORKFLOW
 
-def visualize(data_real, data_syn, metric, mean_flatten = False):
+def visual_evaluation(data_real, data_syn, mean_flatten=False, verbose=False):
     '''
     Visualizes the original and synthetic data using PCA or tSNE
 
@@ -95,7 +97,9 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
         - mean_flatten: bool, whether or not to use the mean of the features or original values of the features for evaluating
     '''
 
-    print(f'Preprocessing data. Shape: {data_real.shape}')
+    # check if data syn is array
+    multi_evaluation = isinstance(data_syn, list)
+    print(f'Evaluating multiple datasets?: {multi_evaluation}') if verbose else None
 
     ### Preprocessing 
     data_real = np.asarray(data_real)
@@ -109,7 +113,7 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
     data_syn = data_syn[sampling_indices]
 
     # get shape of original data
-    no, seq_len, dim = data_real.shape
+    _, seq_len, _ = data_real.shape
 
     # flatten data to be in 2 dims
     if mean_flatten: # whether or not to use the mean of the features or original values of the features
@@ -127,12 +131,8 @@ def visualize(data_real, data_syn, metric, mean_flatten = False):
         prep_data_syn = data_syn.reshape(no_samples, -1)
     
     
-    print(f'Data has been preprocessed. Shape: {prep_data_real.shape}')
+    print(f'Data has been preprocessed. Shape: {prep_data_real.shape}') if verbose else None
 
-    ### Apply metric
-    if metric == 'pca':
-        pca(prep_data_real, prep_data_syn)
+    ### Apply metrics
 
-    elif metric == 'tsne':
-        tsne(prep_data_real, prep_data_syn, no_samples)
     

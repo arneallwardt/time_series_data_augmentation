@@ -353,6 +353,9 @@ class EvaluationDataset():
         self.discriminative_data = load_sequential_time_series(data_path, data_shape)
         self.syn_data = self.discriminative_data[:, :-1, :]
         self.predictive_results = pd.read_csv(predictive_results_path)
+        
+        self.pca_results = None
+        self.tsne_results = None
 
     def get_specific_results(self, metric, model=None):
 
