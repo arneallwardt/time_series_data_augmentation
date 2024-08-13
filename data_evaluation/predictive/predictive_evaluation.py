@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import numpy as np
@@ -217,8 +218,11 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
     criterion_MSE = nn.MSELoss()
     criterion_MAE = nn.L1Loss()
 
-    for _ in tqdm(range(hyperparameters["num_evaluation_runs"])):
+    for num_run in tqdm(range(hyperparameters["num_evaluation_runs"])):
 
+        model_path = f'lstm_{evaluation_method}_{num_run+1}.pth'
+
+        ### Training ###
         # get model and optimizer
         model = LSTMRegression(
             device=hyperparameters["device"],
@@ -228,8 +232,7 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
             bidirectional=hyperparameters["bidirectional"],
         ).to(hyperparameters["device"])
         optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters["lr"])
-
-        # train model once
+        
         train_model(
             model=model,
             train_loader=train_loader,
@@ -238,13 +241,26 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
             optimizer=optimizer,
             device=hyperparameters["device"],
             num_epochs=hyperparameters["num_epochs"],
-            verbose=verbose
+            verbose=verbose,
+            save_path=model_path, 
         )
+
+        ### Evaluation ###
+
+        test_model = LSTMRegression(
+            device=hyperparameters["device"],
+            input_size=X_train.shape[-1],
+            hidden_size=hyperparameters["hidden_size"],
+            num_stacked_layers=hyperparameters["num_layers"],
+            bidirectional=hyperparameters["bidirectional"],
+        ).to(hyperparameters["device"])
+
+        test_model.load_state_dict(torch.load(model_path))
 
         # evaluate model on test data and save results
         with torch.inference_mode():
-            model.eval()
-            preds = model(X_test.to(hyperparameters["device"]))
+            test_model.eval()
+            preds = test_model(X_test.to(hyperparameters["device"]))
 
             # inverse scale data to get real values for error calculation
             preds_unscaled = torch.tensor(scaler.inverse_scale_target(preds.cpu().numpy().reshape(-1, 1)))
@@ -255,5 +271,9 @@ def run_model(data, scaler, evaluation_method, hyperparameters, results, verbose
 
             results = pd.concat([results, pd.DataFrame([{'Model': evaluation_method, 'Metric': 'MAE', 'Error': mae}])], ignore_index=True)
             results = pd.concat([results, pd.DataFrame([{'Model': evaluation_method, 'Metric': 'MSE', 'Error': mse}])], ignore_index=True)
+
+        # remove saved model
+        if os.path.isfile(model_path):
+            os.remove(model_path)
 
     return results

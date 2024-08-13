@@ -6,7 +6,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from copy import deepcopy as dc
 
-class AutoencoderV1(nn.Module):
+class ConvAE1(nn.Module):
     def __init__(self, verbose=False):
         super().__init__()
         self.verbose = verbose
@@ -51,7 +51,7 @@ class AutoencoderV1(nn.Module):
         return x
 
 
-class AutoencoderV2(nn.Module):
+class ConvAE2(nn.Module):
     def __init__(self, verbose=False):
         super().__init__()
         self.verbose = verbose
@@ -104,6 +104,7 @@ def train_autoencoder(model,
               val_loader, 
               criterion, 
               optimizer,
+              save_path,
               patience=10):
     
     best_val_loss = np.inf
@@ -166,6 +167,7 @@ def train_autoencoder(model,
             if avg_val_loss_accross_batches < best_val_loss:
                 best_val_loss = avg_val_loss_accross_batches
                 num_epochs_no_improvement = 0
+                torch.save(model.state_dict(), save_path) # save best model to use for testing
 
             else:
                 print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
