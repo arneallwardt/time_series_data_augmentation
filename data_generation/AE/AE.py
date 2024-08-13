@@ -162,8 +162,9 @@ def train_autoencoder(model,
 
 
             # Check for early stopping
-            if accumulated_val_loss < best_val_loss:
-                best_val_loss = accumulated_val_loss
+            avg_val_loss_accross_batches = accumulated_val_loss / len(val_loader)
+            if avg_val_loss_accross_batches < best_val_loss:
+                best_val_loss = avg_val_loss_accross_batches
                 num_epochs_no_improvement = 0
 
             else:
@@ -173,7 +174,7 @@ def train_autoencoder(model,
 
         ### Logging and Plotting ###
 
-        print(f'Epoch: {epoch} \n\b Train Loss: {accumulated_train_loss / len(train_loader)} \n\b Val Loss: {accumulated_val_loss / len(val_loader)}')
+        print(f'Epoch: {epoch} \n\b Train Loss: {accumulated_train_loss / len(train_loader)} \n\b Val Loss: {avg_val_loss_accross_batches}')
         print('*' * 50)
 
         if epoch % 10 == 0:
