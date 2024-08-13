@@ -11,38 +11,45 @@ class ConvVAE(nn.Module):
     def __init__(self, verbose=False):
         super().__init__()
         self.verbose = verbose
-        # N, 5, 12
+    
         self.common_conv = nn.Sequential(
-            nn.Conv1d(5, 5, kernel_size=4, stride=2, padding=1),
+            nn.Conv1d(5, 7, kernel_size=7, stride=1, padding=0),
             nn.ReLU()
         )
         
         self.mean_conv = nn.Sequential(
-            nn.Conv1d(5, 3, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv1d(3, 1, kernel_size=4, stride=1, padding=0),
+            nn.Conv1d(7, 10, kernel_size=6, stride=1, padding=0),
             nn.ReLU()
         )
 
         self.log_var_conv = nn.Sequential(
-            nn.Conv1d(5, 3, kernel_size=3, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv1d(3, 1, kernel_size=4, stride=1, padding=0),
-            nn.ReLU()
-        )
-        
-        self.decoder_conv = nn.Sequential(
-            nn.ConvTranspose1d(1, 3, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.ConvTranspose1d(3, 4, kernel_size=4, stride=1, padding=0),
-            nn.ReLU(),
-            nn.ConvTranspose1d(4, 5, kernel_size=8, stride=1, padding=1),
+            nn.Conv1d(7, 10, kernel_size=6, stride=1, padding=0),
             nn.ReLU()
         )
 
-        self.conv_tran_1 = nn.ConvTranspose1d(1, 3, kernel_size=3, stride=1, padding=0)
-        self.conv_tran_2 = nn.ConvTranspose1d(3, 4, kernel_size=4, stride=1, padding=0)
-        self.conv_tran_3 = nn.ConvTranspose1d(4, 5, kernel_size=8, stride=1, padding=1)
+        self.mean_fc = nn.Sequential(
+            nn.Linear(10, 4),
+            nn.ReLU()
+        )
+        
+        self.log_var_fc = nn.Sequential(
+            nn.Linear(10, 4),
+            nn.ReLU()
+        )
+
+        self.decoder_fc = nn.Sequential(
+            nn.Linear(4, 16),
+            nn.ReLU(),
+        )
+        
+        self.decoder_conv = nn.Sequential(
+            nn.ConvTranspose1d(8, 6, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            
+        )
+
+        self.conv_tran_1 = nn.ConvTranspose1d(8, 6, kernel_size=4, stride=2, padding=0)
+        self.conv_tran_2 = nn.ConvTranspose1d(6, 5, kernel_size=7, stride=1, padding=0)
             
     
     def encode(self, x):
@@ -52,11 +59,16 @@ class ConvVAE(nn.Module):
         out = self.common_conv(x)
         print(f'After common_conv: {out.shape}') if self.verbose else None
 
-        mean = self.mean_conv(x).squeeze()
+        mean = self.mean_conv(out)
         print(f'After mean_conv: {mean.shape}') if self.verbose else None
+        mean = self.mean_fc(torch.flatten(mean, start_dim=1))
+        print(f'After mean_fc: {mean.shape}') if self.verbose else None
 
-        log_var = self.log_var_conv(x).squeeze()
+        log_var = self.log_var_conv(out)
         print(f'After log_var_conv: {log_var.shape}') if self.verbose else None
+        log_var = self.log_var_fc(torch.flatten(log_var, start_dim=1))
+        print(f'After log_var_fc: {log_var.shape}') if self.verbose else None
+
 
         return mean, log_var
     
@@ -72,15 +84,16 @@ class ConvVAE(nn.Module):
         # out = self.decoder_conv(z.unsqueeze(1))
         # print(f'After decoder_conv: {out.shape}') if self.verbose else None
 
-        out = F.relu(self.conv_tran_1(x.unsqueeze(1)))
+        out = self.decoder_fc(x) # shape (n, 16)
+        print(f'After decoder_fc: {out.shape}') if self.verbose else None
+
+        out = out.reshape((out.size(0), 8, 2)) # shape (n, 8, 2)
+        print(f'After reshape: {out.shape}') if self.verbose else None
+
+        out = F.relu(self.conv_tran_1(out))
         print(f'After decoder_conv_1: {out.shape}') if self.verbose else None
         out = F.relu(self.conv_tran_2(out))
         print(f'After decoder_conv_2: {out.shape}') if self.verbose else None
-        out = F.relu(self.conv_tran_3(out))
-        print(f'After decoder_conv_3: {out.shape}') if self.verbose else None
-
-
-
 
         out = out.permute(0, 2, 1)
         print(f'After re-permute: {out.shape}') if self.verbose else None
@@ -98,10 +111,10 @@ class ConvVAE(nn.Module):
         
         return mean, log_var, out
 
-class VAETutorial(nn.Module):
+class FCVAE(nn.Module):
     # Architecture based on https://www.youtube.com/watch?v=pEsC0Vcjc7c
     def __init__(self):
-        super(VAETutorial, self).__init__()
+        super(FCVAE, self).__init__()
 
         self.common_fc = nn.Sequential(
             nn.Linear(5*12, 32),
@@ -171,6 +184,7 @@ def train_vae(model,
               val_loader, 
               criterion, 
               optimizer,
+              model_name,
               patience=10):
     
     best_val_loss = np.inf
@@ -226,8 +240,13 @@ def train_vae(model,
             # Check for early stopping
             avg_val_loss_accross_batches = accumulated_val_loss / len(val_loader)
             if avg_val_loss_accross_batches < best_val_loss:
+
+                # reset early stopping counter and save best validation loss
                 best_val_loss = avg_val_loss_accross_batches
                 num_epochs_no_improvement = 0
+
+                # save model
+                torch.save(model.state_dict(), f"{model_name}.pth")
 
             else:
                 print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
