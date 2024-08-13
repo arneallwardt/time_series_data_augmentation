@@ -1,0 +1,7 @@
+Method,Accuracy
+Autoencoder,51.300000000000004
+Variational Autoencoder,92.75
+Jitter,46.45
+TimeGAN GRU,57.49999999999999
+TimeGAN LSTM,73.65
+Timewarp,52.1
