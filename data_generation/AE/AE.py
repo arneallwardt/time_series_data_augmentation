@@ -4,87 +4,60 @@ import numpy as np
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from copy import deepcopy as dc
+from copy import deepcopy as dc    
 
-class ConvAE1(nn.Module):
-    def __init__(self, verbose=False):
+
+class LSTMAE(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.verbose = verbose
-        # N, 12, 5
+        self.input_size = 5
+        self.hidden_size = 4
+        self.num_layers = 1
+        self.latent_size = 8
         
-        self.conv1 = nn.Conv2d(1, 2, kernel_size=(2, 3), stride=2, padding=1)
-        self.conv2 = nn.Conv2d(2, 4, kernel_size=(3, 2), stride=1, padding=0)
-        self.conv3 = nn.Conv2d(4, 6, kernel_size=(5, 2), stride=1, padding=0) #n, 6, 1, 1
+        self.lstm_encoder = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_layers, batch_first=True)
+        self.fc_encoder = nn.Linear(self.hidden_size, self.latent_size)
         
-        # Decoder
-        self.deconv1 = nn.ConvTranspose2d(6, 4, kernel_size=(5, 2), stride=1, padding=0)
-        self.deconv2 = nn.ConvTranspose2d(4, 2, kernel_size=(3, 2), stride=1, padding=0)
-        self.deconv3 = nn.ConvTranspose2d(2, 1, kernel_size=(2, 3), stride=2, padding=(1, 1))
-    
-    def forward(self, x):
-        x = x.unsqueeze(1)
-        
-        print(f'Input after unsqueeze: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv1(x))
-        print(f'After conv1: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv2(x))
-        print(f'After conv2: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv3(x))
-        print(f'After conv3: {x.shape}') if self.verbose else None
-
-
-        x = F.relu(self.deconv1(x))
-        print(f'After conv_tran1: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.deconv2(x))
-        print(f'After conv_tran2: {x.shape}') if self.verbose else None
-
-        x = F.sigmoid(self.deconv3(x))
-        print(f'After conv_tran3: {x.shape}') if self.verbose else None
-
-        x = x.squeeze(1)
-        print(f'After squeeze: {x.shape}') if self.verbose else None
-        
-        return x
-
-
-class ConvAE2(nn.Module):
-    def __init__(self, verbose=False):
-        super().__init__()
-        self.verbose = verbose
-        # N, 5, 12
-        
-        self.encoder = nn.Sequential(
-            nn.Conv1d(5, 5, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv1d(5, 5, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Conv1d(5, 5, kernel_size=4, stride=1, padding=0),
-            nn.ReLU()
-        )
+        self.lstm_decoder = nn.LSTM(input_size=self.latent_size, hidden_size=self.hidden_size, num_layers=self.num_layers, batch_first=True)
+        self.fc_decoder = nn.Linear(self.hidden_size, 12*5)
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose1d(5, 5, kernel_size=4, stride=1, padding=0),
+            nn.Linear(8, 16),
             nn.ReLU(),
-            nn.ConvTranspose1d(5, 5, kernel_size=3, stride=1, padding=0),
+            nn.Linear(16, 32),
             nn.ReLU(),
-            nn.ConvTranspose1d(5, 5, kernel_size=4, stride=2, padding=1),
+            nn.Linear(32, 48),
+            nn.ReLU(),
+            nn.Linear(48, 12*5),
             nn.ReLU()
         )
 
+    def encode(self, x):
+        batch_size = x.size(0)
+        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+
+        encoded, _ = self.lstm_encoder(x, (h0, c0))
+        encoded = self.fc_encoder(encoded[:, -1, :])
+
+        return encoded
+    
+    def decode(self, x):
+        batch_size = x.size(0)
+        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+
+        decoded, _ = self.lstm_decoder(x, (h0, c0))
+        decoded = F.relu(self.fc_decoder(decoded[:, -1, :]))
+
+        return decoded
     
     def forward(self, x):
-        x = x.permute(0, 2, 1)
-
-        x = self.encoder(x)
+        x = self.encode(x)
         x = self.decoder(x)
-
-        x = x.permute(0, 2, 1)
+        x = x.view(-1, 12, 5)
         return x
-    
+
 
 class FCAE(nn.Module):
     def __init__(self, verbose=False):
@@ -103,71 +76,13 @@ class FCAE(nn.Module):
             nn.ReLU()
         )
 
-        self.decoder = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.ReLU(),
-            nn.Linear(16, 32),
-            nn.ReLU(),
-            nn.Linear(32, 48),
-            nn.ReLU(),
-            nn.Linear(48, 12*5),
-            nn.ReLU()
-        )
+        
     
     def forward(self, x):
         x = x.flatten(start_dim=1)
         x = self.encoder(x)
         x = self.decoder(x)
         x = x.view(-1, 12, 5)
-        return x
-    
-
-class ConvAE3(nn.Module):
-    def __init__(self, verbose=False):
-        super().__init__()
-        self.verbose = verbose
-        
-        self.conv1 = nn.Conv1d(5, 6, kernel_size=8, stride=1, padding=1) # N, 7, 7
-        self.conv2 = nn.Conv1d(6, 8, kernel_size=6, stride=1, padding=1) # N, 8, 4
-        self.fc1 = nn.Linear(8*4, 4) # N, 4
-        
-        # Decoder
-        self.fc2 = nn.Linear(4, 16) # N, 16
-        self.conv_tran1 = nn.ConvTranspose1d(8, 6, kernel_size=6, stride=1, padding=1)
-        self.conv_tran2 = nn.ConvTranspose1d(6, 5, kernel_size=6, stride=2, padding=1)
-    
-    def forward(self, x):
-        x = x.permute(0, 2, 1)
-        
-        print(f'Input after unsqueeze and permute: {x.shape}') if self.verbose else None
-
-        # Encoder
-        x = F.relu(self.conv1(x))
-        print(f'After conv1: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv2(x))
-        print(f'After conv2: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.fc1(x.flatten(start_dim=1)))
-        print(f'After fc1: {x.shape}') if self.verbose else None
-
-
-        # Decoder
-        x = F.relu(self.fc2(x)).reshape(x.shape[0], 8, 2)
-        print(f'After fc2: {x.shape}') if self.verbose else None
-
-        x = x.reshape(-1, 8, 2)
-        print(f'After reshape: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv_tran1(x))
-        print(f'After conv_tran1: {x.shape}') if self.verbose else None
-
-        x = F.relu(self.conv_tran2(x))
-        print(f'After conv_tran2: {x.shape}') if self.verbose else None
-        
-        x = x.permute(0, 2, 1)
-        print(f'After re-permute: {x.shape}') if self.verbose else None
-
         return x
     
 
