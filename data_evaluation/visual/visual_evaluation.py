@@ -3,6 +3,12 @@ from sklearn.decomposition import PCA
 from scipy.spatial.distance import pdist, squareform 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+original_color = os.getenv('RED', 'red')
+synthetic_color = os.getenv('BLUE', 'blue')
 
 ### EVALUATION METRICS ###
 
@@ -53,8 +59,8 @@ def plot_pca_results(pca_real_results, eval_datasets):
 
     for i in range(num_results):
         
-        axarr[i].scatter(pca_real_results[:,0], pca_real_results[:,1], c='red', alpha = 0.2, label = "Original")
-        axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c='blue', alpha = 0.2, label = "Synthetic")
+        axarr[i].scatter(pca_real_results[:,0], pca_real_results[:,1], c=original_color, alpha = 0.2, label = "Original")
+        axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c=synthetic_color, alpha = 0.2, label = "Synthetic")
 
         axarr[i].legend()  
         axarr[i].set_title(f'{eval_datasets[i].type} PCA results')
@@ -87,7 +93,7 @@ def get_tsne_results(real, syn, no_samples):
 
 def plot_tsne_results(eval_datasets, no_samples):
 
-    colors = ["red" for _ in range(no_samples)] + ["blue" for _ in range(no_samples)]  
+    colors = [original_color for _ in range(no_samples)] + [synthetic_color for _ in range(no_samples)]  
 
     num_results = len(eval_datasets)
     f, axarr = plt.subplots(1, num_results, figsize=(5*num_results, 5))

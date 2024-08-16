@@ -364,7 +364,7 @@ class EvaluationDataset():
 
         if model:
             filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == model)]
-            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{model}-{self.type}')
+            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{self.type}')
         else:
             filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric)]
 
