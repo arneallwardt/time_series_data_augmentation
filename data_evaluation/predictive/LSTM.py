@@ -131,6 +131,7 @@ def train_model(
         criterion, 
         optimizer, 
         device,
+        save_path,
         verbose=True,
         patience=5, 
         num_epochs=1000):
@@ -157,6 +158,7 @@ def train_model(
         if current_validation_loss < best_validation_loss:
             best_validation_loss = current_validation_loss
             num_epoch_without_improvement = 0
+            torch.save(model.state_dict(), save_path) # save best model to use for testing
         else:
             print(f'INFO: Validation loss did not improve in epoch {epoch + 1}') if verbose else None
             num_epoch_without_improvement += 1

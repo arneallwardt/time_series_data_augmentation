@@ -6,7 +6,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from copy import deepcopy as dc
 
-class AutoencoderV1(nn.Module):
+class ConvAE1(nn.Module):
     def __init__(self, verbose=False):
         super().__init__()
         self.verbose = verbose
@@ -51,20 +51,90 @@ class AutoencoderV1(nn.Module):
         return x
 
 
-class AutoencoderV2(nn.Module):
+class ConvAE2(nn.Module):
     def __init__(self, verbose=False):
         super().__init__()
         self.verbose = verbose
         # N, 5, 12
         
-        self.conv1 = nn.Conv1d(5, 5, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv1d(5, 5, kernel_size=3, stride=1, padding=0)
-        self.conv3 = nn.Conv1d(5, 5, kernel_size=4, stride=1, padding=0)
+        self.encoder = nn.Sequential(
+            nn.Conv1d(5, 5, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(5, 5, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(5, 5, kernel_size=4, stride=1, padding=0),
+            nn.ReLU()
+        )
+
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose1d(5, 5, kernel_size=4, stride=1, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(5, 5, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(5, 5, kernel_size=4, stride=2, padding=1),
+            nn.ReLU()
+        )
+
+    
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+
+        x = self.encoder(x)
+        x = self.decoder(x)
+
+        x = x.permute(0, 2, 1)
+        return x
+    
+
+class FCAE(nn.Module):
+    def __init__(self, verbose=False):
+        super().__init__()
+        self.verbose = verbose
+        # N, 12, 5
+        
+        self.encoder = nn.Sequential(
+            nn.Linear(12*5, 48),
+            nn.ReLU(),
+            nn.Linear(48, 32),
+            nn.ReLU(),
+            nn.Linear(32, 16),
+            nn.ReLU(),
+            nn.Linear(16, 8),
+            nn.ReLU()
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(8, 16),
+            nn.ReLU(),
+            nn.Linear(16, 32),
+            nn.ReLU(),
+            nn.Linear(32, 48),
+            nn.ReLU(),
+            nn.Linear(48, 12*5),
+            nn.ReLU()
+        )
+    
+    def forward(self, x):
+        x = x.flatten(start_dim=1)
+        x = self.encoder(x)
+        x = self.decoder(x)
+        x = x.view(-1, 12, 5)
+        return x
+    
+
+class ConvAE3(nn.Module):
+    def __init__(self, verbose=False):
+        super().__init__()
+        self.verbose = verbose
+        
+        self.conv1 = nn.Conv1d(5, 6, kernel_size=8, stride=1, padding=1) # N, 7, 7
+        self.conv2 = nn.Conv1d(6, 8, kernel_size=6, stride=1, padding=1) # N, 8, 4
+        self.fc1 = nn.Linear(8*4, 4) # N, 4
         
         # Decoder
-        self.deconv1 = nn.ConvTranspose1d(5, 5, kernel_size=4, stride=1, padding=0)
-        self.deconv2 = nn.ConvTranspose1d(5, 5, kernel_size=3, stride=1, padding=0)
-        self.deconv3 = nn.ConvTranspose1d(5, 5, kernel_size=4, stride=2, padding=1)
+        self.fc2 = nn.Linear(4, 16) # N, 16
+        self.conv_tran1 = nn.ConvTranspose1d(8, 6, kernel_size=6, stride=1, padding=1)
+        self.conv_tran2 = nn.ConvTranspose1d(6, 5, kernel_size=6, stride=2, padding=1)
     
     def forward(self, x):
         x = x.permute(0, 2, 1)
@@ -78,19 +148,22 @@ class AutoencoderV2(nn.Module):
         x = F.relu(self.conv2(x))
         print(f'After conv2: {x.shape}') if self.verbose else None
 
-        x = F.relu(self.conv3(x))
-        print(f'After conv3: {x.shape}') if self.verbose else None
+        x = F.relu(self.fc1(x.flatten(start_dim=1)))
+        print(f'After fc1: {x.shape}') if self.verbose else None
 
 
         # Decoder
-        x = F.relu(self.deconv1(x))
+        x = F.relu(self.fc2(x)).reshape(x.shape[0], 8, 2)
+        print(f'After fc2: {x.shape}') if self.verbose else None
+
+        x = x.reshape(-1, 8, 2)
+        print(f'After reshape: {x.shape}') if self.verbose else None
+
+        x = F.relu(self.conv_tran1(x))
         print(f'After conv_tran1: {x.shape}') if self.verbose else None
 
-        x = F.relu(self.deconv2(x))
+        x = F.relu(self.conv_tran2(x))
         print(f'After conv_tran2: {x.shape}') if self.verbose else None
-
-        x = F.sigmoid(self.deconv3(x))
-        print(f'After conv_tran3: {x.shape}') if self.verbose else None
         
         x = x.permute(0, 2, 1)
         print(f'After re-permute: {x.shape}') if self.verbose else None
@@ -104,10 +177,13 @@ def train_autoencoder(model,
               val_loader, 
               criterion, 
               optimizer,
+              save_path,
               patience=10):
     
     best_val_loss = np.inf
     num_epochs_no_improvement = 0
+    train_losses = []
+    val_losses = []
 
     for epoch in tqdm(range(hyperparameters['num_epochs'])):
 
@@ -136,6 +212,8 @@ def train_autoencoder(model,
             optimizer.zero_grad()
             train_loss.backward()
             optimizer.step()
+
+        avg_train_loss_accross_batches = accumulated_train_loss / len(train_loader)
 
 
         ### Validation ###
@@ -166,6 +244,7 @@ def train_autoencoder(model,
             if avg_val_loss_accross_batches < best_val_loss:
                 best_val_loss = avg_val_loss_accross_batches
                 num_epochs_no_improvement = 0
+                torch.save(model.state_dict(), save_path) # save best model to use for testing
 
             else:
                 print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
@@ -174,7 +253,10 @@ def train_autoencoder(model,
 
         ### Logging and Plotting ###
 
-        print(f'Epoch: {epoch} \n\b Train Loss: {accumulated_train_loss / len(train_loader)} \n\b Val Loss: {avg_val_loss_accross_batches}')
+        train_losses.append(avg_train_loss_accross_batches)
+        val_losses.append(avg_val_loss_accross_batches)
+
+        print(f'Epoch: {epoch} \n\b Train Loss: {avg_train_loss_accross_batches} \n\b Val Loss: {avg_val_loss_accross_batches}')
         print('*' * 50)
 
         if epoch % 10 == 0:
@@ -190,3 +272,5 @@ def train_autoencoder(model,
         if num_epochs_no_improvement >= patience:
             print(f'Early stopping at epoch {epoch}')
             break
+
+    return train_losses, val_losses

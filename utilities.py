@@ -351,7 +351,7 @@ def save_unscaled_sequential_data(ori_data_path, scaled_data_path, scaled_data_s
     
 
 class EvaluationDataset():
-    def __init__(self, type, data_path, predictive_results_path, data_shape=(3000, 13, 5)):
+    def __init__(self, type, data_path, predictive_results_path, data_shape=(4000, 13, 5)):
         self.type = type
         self.discriminative_data = load_sequential_time_series(data_path, data_shape)
         self.syn_data = self.discriminative_data[:, :-1, :]
@@ -364,7 +364,7 @@ class EvaluationDataset():
 
         if model:
             filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == model)]
-            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{model}-{self.type}')
+            filtered_df.loc[:, 'Model'] = filtered_df['Model'].replace(model, f'{self.type}')
         else:
             filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric)]
 
