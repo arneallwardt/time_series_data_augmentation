@@ -116,10 +116,10 @@ def train_autoencoder(model,
             X_train_hat_copy = X_train_hat.clone()
             X_train_copy = X_train.clone()
 
-            X_train_hat_copy[:, :, 0] *= 2
-            X_train_hat_copy[:, :, 1] *= 2
-            X_train_copy[:, :, 0] *= 2
-            X_train_copy[:, :, 1] *= 2
+            X_train_hat_copy[:, :, 0] *= 1.5
+            X_train_hat_copy[:, :, 1] *= 1.5
+            X_train_copy[:, :, 0] *= 1.5
+            X_train_copy[:, :, 1] *= 1.5
 
             train_loss = criterion(X_train_hat, X_train)
             accumulated_train_loss += train_loss.item()
