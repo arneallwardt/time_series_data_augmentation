@@ -176,6 +176,72 @@ class FCVAE(nn.Module):
         out = out.reshape((z.size(0), 12, 5))
         return out
 
+
+class LSTMVAE(nn.Module):
+
+    def __init__(self):
+        super(FCVAE, self).__init__()
+
+        self.common_fc = nn.Sequential(
+            nn.Linear(5*12, 32),
+            nn.ReLU()
+        )
+
+        self.mean_fc = nn.Sequential(
+            nn.Linear(32, 16),
+            nn.ReLU(),
+            nn.Linear(16, 4)
+        )
+
+        self.log_var_fc = nn.Sequential(
+            nn.Linear(32, 16),
+            nn.ReLU(),
+            nn.Linear(16, 4)
+        )
+
+        self.decoder_fc = nn.Sequential(
+            nn.Linear(4, 16),
+            nn.ReLU(),
+            nn.Linear(16, 32),
+            nn.ReLU(),
+            nn.Linear(32, 5*12),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        # Encoder 
+        mean, log_var = self.encode(x)
+
+        # Sampling
+        z = self.sample(mean, log_var)
+
+        # Decoder 
+        out = self.decode(z)
+
+        return mean, log_var, out
+    
+    def encode(self, x):
+        out = self.common_fc(torch.flatten(x, start_dim=1)) # run common_fc on flattened input
+        
+        # get mean and log_var
+        mean = self.mean_fc(out)
+        log_var = self.log_var_fc(out)
+
+        return mean, log_var
+    
+    def sample(self, mean, log_var):
+        std = torch.exp(0.5*log_var) # get standard deviation
+
+        z = torch.randn_like(std) # sample from normal distribution
+        z = z * std + mean # reparameterization trick
+
+        return z
+    
+    def decode(self, z):
+        out = self.decoder_fc(z)
+        out = out.reshape((z.size(0), 12, 5))
+        return out
+
     
 
 def train_vae(model, 
