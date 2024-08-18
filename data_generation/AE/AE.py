@@ -42,16 +42,6 @@ class LSTMAE(nn.Module):
 
         return encoded
     
-    def decode(self, x):
-        batch_size = x.size(0)
-        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
-
-        decoded, _ = self.lstm_decoder(x, (h0, c0))
-        decoded = F.relu(self.fc_decoder(decoded[:, -1, :]))
-
-        return decoded
-    
     def forward(self, x):
         x = self.encode(x)
         x = self.decoder(x)

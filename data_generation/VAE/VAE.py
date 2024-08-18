@@ -180,27 +180,22 @@ class FCVAE(nn.Module):
 class LSTMVAE(nn.Module):
 
     def __init__(self):
-        super(FCVAE, self).__init__()
+        super(LSTMVAE, self).__init__()
 
-        self.common_fc = nn.Sequential(
-            nn.Linear(5*12, 32),
-            nn.ReLU()
-        )
+        self.input_size = 5
+        self.hidden_size = 6
+        self.num_layers = 1
+        self.latent_size = 16
+        self.latent_size_2 = 4
+        
+        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_layers, batch_first=True)
+        self.fc = nn.Linear(self.hidden_size, self.latent_size)
 
-        self.mean_fc = nn.Sequential(
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 4)
-        )
-
-        self.log_var_fc = nn.Sequential(
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 4)
-        )
+        self.mean_fc = nn.Linear(self.latent_size, self.latent_size_2)
+        self.log_var_fc = nn.Linear(self.latent_size, self.latent_size_2)
 
         self.decoder_fc = nn.Sequential(
-            nn.Linear(4, 16),
+            nn.Linear(self.latent_size_2, 16),
             nn.ReLU(),
             nn.Linear(16, 32),
             nn.ReLU(),
@@ -208,20 +203,18 @@ class LSTMVAE(nn.Module):
             nn.ReLU()
         )
 
-    def forward(self, x):
-        # Encoder 
-        mean, log_var = self.encode(x)
+    def common_lstm(self, x):
+        batch_size = x.size(0)
+        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
 
-        # Sampling
-        z = self.sample(mean, log_var)
+        out, _ = self.lstm(x, (h0, c0))
+        out = F.relu(self.fc(out[:, -1, :]))
 
-        # Decoder 
-        out = self.decode(z)
-
-        return mean, log_var, out
+        return out
     
     def encode(self, x):
-        out = self.common_fc(torch.flatten(x, start_dim=1)) # run common_fc on flattened input
+        out = self.common_lstm(x)
         
         # get mean and log_var
         mean = self.mean_fc(out)
@@ -241,6 +234,18 @@ class LSTMVAE(nn.Module):
         out = self.decoder_fc(z)
         out = out.reshape((z.size(0), 12, 5))
         return out
+    
+    def forward(self, x):
+        # Encoder 
+        mean, log_var = self.encode(x)
+
+        # Sampling
+        z = self.sample(mean, log_var)
+
+        # Decoder 
+        out = self.decode(z)
+
+        return mean, log_var, out
 
     
 
@@ -255,6 +260,8 @@ def train_vae(model,
     
     best_val_loss = np.inf
     num_epochs_no_improvement = 0
+    train_losses = []
+    val_losses = []
 
     for epoch in range(hyperparameters["num_epochs"]):
 
@@ -312,7 +319,7 @@ def train_vae(model,
                 num_epochs_no_improvement = 0
 
                 # save model
-                torch.save(model.state_dict(), f"{model_name}.pth")
+                torch.save(model.state_dict(), f"{model_name}_checkpoint.pth")
 
             else:
                 print(f'INFO: Validation loss did not improve in epoch {epoch + 1}')
@@ -321,9 +328,14 @@ def train_vae(model,
 
         ### Logging ###
 
+        train_losses.append(accumulated_loss / len(train_loader))
+        val_losses.append(avg_val_loss_accross_batches)
+
         if epoch % 10 == 0:
             print(f"Epoch {epoch+1} | avg. Recon Loss: {(accumulated_recon_loss / len(train_loader)):.4f} | avg. KL Loss: {(accumulated_kl_loss / len(train_loader)):.4f} | avg. Train Loss: {(accumulated_loss / len(train_loader)):.4f} | avg. Val Loss: {avg_val_loss_accross_batches:.4f}")
 
         if num_epochs_no_improvement >= patience:
             print(f'Early stopping at epoch {epoch}')
             break
+
+    return train_losses, val_losses
