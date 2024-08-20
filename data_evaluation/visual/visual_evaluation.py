@@ -63,7 +63,7 @@ def plot_pca_results(pca_real_results, eval_datasets):
         axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c=synthetic_color, alpha = 0.2, label = "Synthetic")
 
         axarr[i].legend()  
-        axarr[i].set_title(f'{eval_datasets[i].type} PCA results')
+        axarr[i].set_title(f'{eval_datasets[i].type} PCA')
         axarr[i].set_xlabel('x-pca')
         axarr[i].set_ylabel('y_pca')
 
@@ -110,7 +110,7 @@ def plot_tsne_results(eval_datasets, no_samples):
                         c=colors[no_samples:], alpha=0.2, label="Synthetic")
         
         axarr[i].legend()
-        axarr[i].set_title(f'{eval_datasets[i].type} t-SNE results')
+        axarr[i].set_title(f'{eval_datasets[i].type} t-SNE')
         axarr[i].set_xlabel('x-tsne')
         axarr[i].set_ylabel('y-tsne')
 
