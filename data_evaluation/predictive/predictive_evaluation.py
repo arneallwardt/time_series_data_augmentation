@@ -86,7 +86,7 @@ def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparamete
     real_test, real_val = train_test_split(real_test, split_ratio=0.5)
 
     # split synthetic data (only train and val)
-    syn_train, syn_val = train_test_split(syn_data, split_ratio=0.8)
+    syn_train, syn_val = train_test_split(syn_data, split_ratio=0.9)
 
     ### Scale data
     # create temporary array to fit scaler

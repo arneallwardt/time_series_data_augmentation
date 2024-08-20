@@ -50,16 +50,13 @@ def train_one_epoch(
         train_loader, 
         criterion, 
         optimizer, 
-        device, 
-        verbose=True,
-        log_interval=200):
+        device):
     
     model.train()
     running_train_loss = 0.0
-    total_train_loss = 0.0
     running_train_acc = 0.0
 
-    for batch_index, batch in enumerate(train_loader):
+    for _, batch in enumerate(train_loader):
         x_batch, y_batch = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)  
         
         optimizer.zero_grad()
@@ -76,16 +73,7 @@ def train_one_epoch(
 
         optimizer.step()
 
-        if batch_index % log_interval == 0 and batch_index > 0:
-            
-            # log training loss 
-            avg_train_loss_across_batches = running_train_loss / log_interval
-            print(f'Training Loss: {avg_train_loss_across_batches}') if verbose else None
-
-            total_train_loss += running_train_loss
-            running_train_loss = 0.0 # reset running loss
-
-    avg_train_loss = total_train_loss / len(train_loader)
+    avg_train_loss = running_train_loss / len(train_loader)
     avg_train_acc = running_train_acc / len(train_loader)
     return avg_train_loss, avg_train_acc
 
@@ -94,8 +82,7 @@ def validate_one_epoch(
         model, 
         val_loader, 
         criterion, 
-        device, 
-        verbose=True):
+        device):
     
     '''Validates the model and returns the average validation loss.'''
     
@@ -117,10 +104,7 @@ def validate_one_epoch(
 
     # log validation loss
     avg_test_loss_across_batches = running_test_loss / len(val_loader)
-    print(f'Validation Loss: {avg_test_loss_across_batches}') if verbose else None
-
     avg_test_acc_accross_batches = running_test_acc / len(val_loader)
-    print(f'Validation Accuracy: {avg_test_acc_accross_batches}') if verbose else None
     return avg_test_loss_across_batches, avg_test_acc_accross_batches
 
 
@@ -145,9 +129,8 @@ def train_model(
     best_validation_loss = np.inf
     num_epoch_without_improvement = 0
     for epoch in range(num_epochs):
-        print(f'Epoch: {epoch + 1}') if verbose else None
-        current_train_loss, current_train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, verbose=verbose)
-        current_validation_loss, current_validation_acc = validate_one_epoch(model, val_loader, criterion, device, verbose=verbose)
+        current_train_loss, current_train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        current_validation_loss, current_validation_acc = validate_one_epoch(model, val_loader, criterion, device)
 
         train_losses.append(current_train_loss)
         train_accs.append(current_train_acc)
@@ -167,6 +150,10 @@ def train_model(
             print(f'Early stopping after {epoch + 1} epochs') if verbose else None
             break
 
-        print(f'*' * 50) if verbose else None
+        if epoch % 10 == 0:
+            print(f'Epoch: {epoch + 1}') if verbose else None
+            print(f'Train Loss: {current_train_loss} // Train Acc: {current_train_acc}') if verbose else None
+            print(f'Val Loss: {current_validation_loss} // Val Acc: {current_validation_acc}') if verbose else None
+            print(f'*' * 50) if verbose else None
 
     return train_losses, train_accs, val_losses, val_accs, model
