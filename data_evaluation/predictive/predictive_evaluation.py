@@ -87,6 +87,7 @@ def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparamete
 
     # split synthetic data (only train and val)
     syn_train, syn_val = train_test_split(syn_data, split_ratio=0.9)
+    syn_train = syn_train[:len(syn_train)//2] # limit size of synthetic data to half
 
     ### Scale data
     # create temporary array to fit scaler
