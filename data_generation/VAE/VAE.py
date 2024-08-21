@@ -112,28 +112,28 @@ class ConvVAE(nn.Module):
         return mean, log_var, out
 
 class FCVAE(nn.Module):
-    # Architecture based on https://www.youtube.com/watch?v=pEsC0Vcjc7c
+    # Code adapted from https://github.com/pytorch/examples/blob/main/vae/main.py
     def __init__(self):
         super(FCVAE, self).__init__()
 
-        self.common_fc = nn.Sequential(
+        self.fc1 = nn.Sequential(
             nn.Linear(5*12, 32),
             nn.ReLU()
         )
 
-        self.mean_fc = nn.Sequential(
+        self.fc21 = nn.Sequential(
             nn.Linear(32, 16),
             nn.ReLU(),
             nn.Linear(16, 4)
         )
 
-        self.log_var_fc = nn.Sequential(
+        self.fc22 = nn.Sequential(
             nn.Linear(32, 16),
             nn.ReLU(),
             nn.Linear(16, 4)
         )
 
-        self.decoder_fc = nn.Sequential(
+        self.fc3 = nn.Sequential(
             nn.Linear(4, 16),
             nn.ReLU(),
             nn.Linear(16, 32),
@@ -142,39 +142,24 @@ class FCVAE(nn.Module):
             nn.ReLU()
         )
 
-    def forward(self, x):
-        # Encoder 
-        mean, log_var = self.encode(x)
-
-        # Sampling
-        z = self.sample(mean, log_var)
-
-        # Decoder 
-        out = self.decode(z)
-
-        return mean, log_var, out
-    
     def encode(self, x):
-        out = self.common_fc(torch.flatten(x, start_dim=1)) # run common_fc on flattened input
-        
-        # get mean and log_var
-        mean = self.mean_fc(out)
-        log_var = self.log_var_fc(out)
-
-        return mean, log_var
+        h1 = self.fc1(x)
+        return self.fc21(h1), self.fc22(h1) # return mu and logvar
     
-    def sample(self, mean, log_var):
-        std = torch.exp(0.5*log_var) # get standard deviation
-
-        z = torch.randn_like(std) # sample from normal distribution
-        z = z * std + mean # reparameterization trick
-
-        return z
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar) # get standard deviation
+        eps = torch.randn_like(std) # sample from normal distribution
+        return mu + eps*std # reparameterization trick
     
     def decode(self, z):
-        out = self.decoder_fc(z)
-        out = out.reshape((z.size(0), 12, 5))
-        return out
+        h3 = self.fc3(z)
+        h3 = h3.reshape((z.size(0), 12, 5))
+        return h3
+    
+    def forward(self, x):
+        mu, logvar = self.encode(torch.flatten(x, start_dim=1)) # Encoder
+        z = self.reparameterize(mu, logvar) # Sampling and reparameterization
+        return mu, logvar, self.decode(z)
 
 
 class LSTMVAE(nn.Module):

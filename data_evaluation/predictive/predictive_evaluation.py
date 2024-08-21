@@ -87,7 +87,6 @@ def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparamete
 
     # split synthetic data (only train and val)
     syn_train, syn_val = train_test_split(syn_data, split_ratio=0.9)
-    # syn_train = syn_train[:int(len(syn_train)*0.75)] # limit size of synthetic data to half
 
     ### Scale data
     # create temporary array to fit scaler
@@ -119,6 +118,12 @@ def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparamete
         syn_val_seq_scaled = split_data_into_sequences(syn_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
 
     
+    # get random 50% of synthetic train data
+    total_elements = syn_train_seq_scaled.shape[0]
+    num_elements = total_elements // 2
+    random_syn_train_indices = np.random.choice(total_elements, size=num_elements, replace=False)
+    syn_train_seq_scaled = syn_train_seq_scaled[random_syn_train_indices]
+
     # combine real and syn data
     train_seq_scaled = np.concatenate((real_train_seq_scaled, syn_train_seq_scaled), axis=0)
     val_seq_scaled = np.concatenate((real_val_seq_scaled, syn_val_seq_scaled), axis=0)
