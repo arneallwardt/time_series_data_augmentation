@@ -33,8 +33,7 @@ def predictive_evaluation(
     if include_baseline:
 
         ### Baseline ###
-        baseline_train_data, baseline_test_data = train_test_split(data_train_real_dc, split_ratio=0.8) # split real data into train and test
-        baseline_data, baseline_scaler = get_distinct_data(train_data=baseline_train_data, test_data=baseline_test_data,
+        baseline_data, baseline_scaler = get_distinct_data(train_data=data_train_real_dc, test_data=data_test_real_dc,
                                                         evaluation_method='baseline',
                                                         syn_data_is_sequential=data_syn_is_sequential,
                                                         hyperparameters=hyperparameters)
