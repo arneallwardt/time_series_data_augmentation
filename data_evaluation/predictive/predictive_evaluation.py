@@ -10,9 +10,16 @@ from data_evaluation.predictive.LSTM import LSTMRegression, train_model
 from utilities import Scaler, train_test_split, extract_features_and_targets_reg, split_data_into_sequences
 from data_evaluation.predictive.TimeSeriesDataset import TimeSeriesDataset
 
-def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparameters, include_baseline=False, verbose=True):
+def predictive_evaluation(
+        data_train_real: np.array, 
+        data_test_real: np.array,
+        data_syn: np.array, 
+        hyperparameters, 
+        include_baseline=False, 
+        verbose=True):
 
-    data_real_dc = dc(data_real)
+    data_train_real_dc = dc(data_train_real)
+    data_test_real_dc = dc(data_test_real)
     data_syn_dc = dc(data_syn)
     results = pd.DataFrame(columns=['Model', 'Metric', 'Error'])
 
@@ -26,7 +33,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
     if include_baseline:
 
         ### Baseline ###
-        baseline_train_data, baseline_test_data = train_test_split(data_real_dc, split_ratio=0.8) # split real data into train and test
+        baseline_train_data, baseline_test_data = train_test_split(data_train_real_dc, split_ratio=0.8) # split real data into train and test
         baseline_data, baseline_scaler = get_distinct_data(train_data=baseline_train_data, test_data=baseline_test_data,
                                                         evaluation_method='baseline',
                                                         syn_data_is_sequential=data_syn_is_sequential,
@@ -40,7 +47,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
 
 
     ### TRTS ###
-    TRTS_data, TRTS_scaler = get_distinct_data(train_data=data_real_dc, test_data=data_syn_dc,
+    TRTS_data, TRTS_scaler = get_distinct_data(train_data=data_train_real_dc, test_data=data_syn_dc,
                                             evaluation_method='TRTS',
                                             syn_data_is_sequential=data_syn_is_sequential,
                                             hyperparameters=hyperparameters)
@@ -53,7 +60,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
     
     
     ### TSTR ###
-    TSTR_data, TSTR_scaler = get_distinct_data(train_data=data_syn_dc, test_data=data_real_dc,
+    TSTR_data, TSTR_scaler = get_distinct_data(train_data=data_syn_dc, test_data=data_train_real_dc,
                                             evaluation_method='TSTR',
                                             syn_data_is_sequential=data_syn_is_sequential,
                                             hyperparameters=hyperparameters)
@@ -66,7 +73,7 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
     
 
     ### Combined ###
-    combined_data, combined_scaler = get_combined_data(real_data=data_real_dc, syn_data=data_syn_dc,
+    combined_data, combined_scaler = get_combined_data(real_train_data=data_train_real_dc, real_test_data=data_test_real_dc, syn_data=data_syn_dc,
                                             syn_data_is_sequential=data_syn_is_sequential,  
                                             hyperparameters=hyperparameters)
     
@@ -80,13 +87,15 @@ def predictive_evaluation(data_real: np.array, data_syn: np.array, hyperparamete
     return results
 
 
-def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparameters):
+def get_combined_data(real_train_data, real_test_data, syn_data, syn_data_is_sequential, hyperparameters):
     # split real data (one part for train and val and one part for test)
-    real_train, real_test = train_test_split(real_data, split_ratio=0.8)
+    real_train = real_train_data
+    real_test = real_test_data
+
     real_test, real_val = train_test_split(real_test, split_ratio=0.5)
 
     # split synthetic data (only train and val)
-    syn_train, syn_val = train_test_split(syn_data, split_ratio=0.8) # maybe try to use only real val data here
+    syn_train = syn_data
 
     ### Scale data
     # create temporary array to fit scaler
@@ -102,25 +111,22 @@ def get_combined_data(real_data, syn_data, syn_data_is_sequential, hyperparamete
     real_test_scaled = scaler.scale_data(real_test)
 
     syn_train_scaled = scaler.scale_data(syn_train, input_data_is_sequential=syn_data_is_sequential)
-    syn_val_scaled = scaler.scale_data(syn_val, input_data_is_sequential=syn_data_is_sequential)
 
 
     # split data into sequences
-    real_train_seq_scaled = split_data_into_sequences(real_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-    real_val_seq_scaled = split_data_into_sequences(real_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-    real_test_seq_scaled = split_data_into_sequences(real_test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+    real_train_seq_scaled = split_data_into_sequences(real_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+    real_val_seq_scaled = split_data_into_sequences(real_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+    real_test_seq_scaled = split_data_into_sequences(real_test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
     if syn_data_is_sequential:
         syn_train_seq_scaled = syn_train_scaled
-        syn_val_seq_scaled = syn_val_scaled
     else:
-        syn_train_seq_scaled = split_data_into_sequences(syn_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-        syn_val_seq_scaled = split_data_into_sequences(syn_val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        syn_train_seq_scaled = split_data_into_sequences(syn_train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
 
     # combine real and syn data
     train_seq_scaled = np.concatenate((real_train_seq_scaled, syn_train_seq_scaled), axis=0)
-    val_seq_scaled = np.concatenate((real_val_seq_scaled, syn_val_seq_scaled), axis=0)
+    val_seq_scaled = real_val_seq_scaled
     test_seq_scaled = real_test_seq_scaled
 
 
@@ -153,9 +159,9 @@ def get_distinct_data(train_data, test_data, evaluation_method, syn_data_is_sequ
 
     # no need to be aware of sequential data as real data is always non-sequential
     if evaluation_method == 'baseline':
-        train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-        val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-        test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+        val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+        test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
 
     # split test data BUT split TRAINING data only if synthetic data is not sequential
@@ -166,25 +172,25 @@ def get_distinct_data(train_data, test_data, evaluation_method, syn_data_is_sequ
             train_seq_scaled = train_scaled
             val_seq_scaled = val_scaled
         else:
-            train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-            val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+            train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+            val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
         # Test data
-        test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
 
     # split train data BUT split TEST data only if synthetic data is not sequential
     elif evaluation_method == 'TRTS':
 
         # Train and val data
-        train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
-        val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+        train_seq_scaled = split_data_into_sequences(train_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
+        val_seq_scaled = split_data_into_sequences(val_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
         # Test data
         if syn_data_is_sequential:
             test_seq_scaled = test_scaled # keep data as is
         else:
-            test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=True)
+            test_seq_scaled = split_data_into_sequences(test_scaled, seq_len=hyperparameters["seq_len"], shuffle_data=False)
 
 
     # extract features and targets

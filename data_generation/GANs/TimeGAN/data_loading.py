@@ -99,7 +99,7 @@ def real_data_loading (data_name, seq_len):
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
   elif data_name == 'traffic':
-    ori_data = np.loadtxt('../../../data/real/metro_interstate_traffic_volume_label_encoded_no_categorical.csv', delimiter = ",",skiprows = 1)
+    ori_data = np.loadtxt('../../../data/real/mitv_prep_1y.csv', delimiter = ",",skiprows = 1)
     print(f'ori data shape: {ori_data.shape}')
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
