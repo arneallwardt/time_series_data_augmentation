@@ -376,6 +376,7 @@ class EvaluationDataset():
     
     def get_baseline_results(self, metric):
         filtered_df = self.predictive_results[(self.predictive_results['Metric'] == metric) & (self.predictive_results['Model'] == 'baseline')]
+        filtered_df['Model'] = filtered_df['Model'].replace('baseline', 'Original')
         return filtered_df
 
 
