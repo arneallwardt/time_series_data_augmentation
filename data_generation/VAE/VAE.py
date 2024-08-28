@@ -113,28 +113,30 @@ class ConvVAE(nn.Module):
 
 class FCVAE(nn.Module):
     # Code adapted from https://github.com/pytorch/examples/blob/main/vae/main.py
-    def __init__(self):
+    def __init__(self, latent_size_1=32, latent_size_2=8):
         super(FCVAE, self).__init__()
+        self.latent_size_1 = latent_size_1
+        self.latent_size_2 = latent_size_2
 
         self.fc1 = nn.Sequential(
-            nn.Linear(5*12, 32),
+            nn.Linear(5*12, self.latent_size_1),
             nn.ReLU()
         )
 
         self.fc21 = nn.Sequential(
-            nn.Linear(32, 16),
+            nn.Linear(self.latent_size_1, 16),
             nn.ReLU(),
-            nn.Linear(16, 4)
+            nn.Linear(16, self.latent_size_2)
         )
 
         self.fc22 = nn.Sequential(
-            nn.Linear(32, 16),
+            nn.Linear(self.latent_size_1, 16),
             nn.ReLU(),
-            nn.Linear(16, 4)
+            nn.Linear(16, self.latent_size_2)
         )
 
         self.fc3 = nn.Sequential(
-            nn.Linear(4, 16),
+            nn.Linear(self.latent_size_2, 16),
             nn.ReLU(),
             nn.Linear(16, 32),
             nn.ReLU(),
@@ -267,7 +269,7 @@ def train_vae(model,
             # calculate loss
             kl_loss = torch.mean(0.5 * torch.sum(torch.exp(log_var) + mean**2 - 1 - log_var, dim=-1))
             reconstruction_loss = criterion(out, X_train)
-            loss = reconstruction_loss + 0.001 * kl_loss # add weight to kl_loss, because it is not as important as recon loss
+            loss = reconstruction_loss + 0.002 * kl_loss # add weight to kl_loss, because it is not as important as recon loss
             
             # save losses for later
             accumulated_recon_loss += reconstruction_loss.item()

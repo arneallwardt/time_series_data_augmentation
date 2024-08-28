@@ -11,7 +11,7 @@ class LSTMAE(nn.Module):
     def __init__(self):
         super().__init__()
         self.input_size = 5
-        self.hidden_size = 4
+        self.hidden_size = 6
         self.num_layers = 1
         self.latent_size = 8
         
@@ -161,10 +161,11 @@ def train_autoencoder(model,
         train_losses.append(avg_train_loss_accross_batches)
         val_losses.append(avg_val_loss_accross_batches)
 
-        print(f'Epoch: {epoch} \n\b Train Loss: {avg_train_loss_accross_batches} \n\b Val Loss: {avg_val_loss_accross_batches}')
-        print('*' * 50)
 
-        if epoch % 10 == 0:
+        if epoch % 25 == 0:
+            print(f'Epoch: {epoch} \n\b Train Loss: {avg_train_loss_accross_batches} \n\b Val Loss: {avg_val_loss_accross_batches}')
+            print('*' * 50)
+
             plot_train = dc(X_train.detach().numpy())
             plot_hat = dc(X_train_hat.detach().numpy())
 
