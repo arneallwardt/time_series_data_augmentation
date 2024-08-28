@@ -7,8 +7,20 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-original_color = os.getenv('RED', 'red')
-synthetic_color = os.getenv('BLUE', 'blue')
+original_color = os.getenv('GRAY', 'red')
+autoencoder_color = os.getenv('BLUE', 'blue')
+timegan_color = os.getenv('GREEN', 'green')
+random_transformation_color = os.getenv('RED', 'red')
+
+plot_colors = {
+    'Jittering': random_transformation_color,
+    'Timewarping': random_transformation_color,
+    'Autoencoder': autoencoder_color,
+    'Variational Autoencoder': autoencoder_color,
+    'TimeGAN LSTM': timegan_color,
+    'TimeGAN GRU': timegan_color,
+}
+color_alpha = 0.4
 
 ### EVALUATION METRICS ###
 
@@ -58,10 +70,9 @@ def plot_pca_results(pca_real_results, eval_datasets):
         axarr = [axarr]
 
     for i in range(num_results):
-        
-        axarr[i].scatter(pca_real_results[:,0], pca_real_results[:,1], c=original_color, alpha = 0.2, label = "Original")
-        axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c=synthetic_color, alpha = 0.2, label = "Synthetic")
 
+        axarr[i].scatter(pca_real_results[:,0], pca_real_results[:,1], c=original_color, alpha=color_alpha, label = "Original")
+        axarr[i].scatter(eval_datasets[i].pca_results[:,0], eval_datasets[i].pca_results[:,1], c=plot_colors[eval_datasets[i].type], alpha=color_alpha, label = "Synthetisch")
         axarr[i].legend()  
         axarr[i].set_title(f'{eval_datasets[i].type} PCA')
         axarr[i].set_xlabel('x-pca')
@@ -93,7 +104,6 @@ def get_tsne_results(real, syn, no_samples):
 
 def plot_tsne_results(eval_datasets, no_samples):
 
-    colors = [original_color for _ in range(no_samples)] + [synthetic_color for _ in range(no_samples)]  
 
     num_results = len(eval_datasets)
     f, axarr = plt.subplots(1, num_results, figsize=(5*num_results, 5))
@@ -103,11 +113,13 @@ def plot_tsne_results(eval_datasets, no_samples):
         axarr = [axarr]
 
     for i in range(num_results):
+
+        colors = [original_color for _ in range(no_samples)] + [plot_colors[eval_datasets[i].type] for _ in range(no_samples)]  
         
         axarr[i].scatter(eval_datasets[i].tsne_results[:no_samples,0], eval_datasets[i].tsne_results[:no_samples,1], 
-                        c=colors[:no_samples], alpha=0.2, label="Original")
+                        c=colors[:no_samples], alpha=color_alpha, label="Original")
         axarr[i].scatter(eval_datasets[i].tsne_results[no_samples:,0], eval_datasets[i].tsne_results[no_samples:,1], 
-                        c=colors[no_samples:], alpha=0.2, label="Synthetic")
+                        c=colors[no_samples:], alpha=color_alpha, label="Synthetisch")
         
         axarr[i].legend()
         axarr[i].set_title(f'{eval_datasets[i].type} t-SNE')
