@@ -14,9 +14,9 @@ random_transformation_color = os.getenv('RED', 'red')
 
 plot_colors = {
     'Jittering': random_transformation_color,
-    'Timewarping': random_transformation_color,
-    'Autoencoder': autoencoder_color,
-    'Variational Autoencoder': autoencoder_color,
+    'Time Warping': random_transformation_color,
+    'AE': autoencoder_color,
+    'VAE': autoencoder_color,
     'TimeGAN LSTM': timegan_color,
     'TimeGAN GRU': timegan_color,
 }
