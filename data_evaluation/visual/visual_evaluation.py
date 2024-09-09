@@ -14,9 +14,9 @@ random_transformation_color = os.getenv('RED', 'red')
 
 plot_colors = {
     'Jittering': random_transformation_color,
-    'Timewarping': random_transformation_color,
-    'Autoencoder': autoencoder_color,
-    'Variational Autoencoder': autoencoder_color,
+    'Time Warping': random_transformation_color,
+    'AE': autoencoder_color,
+    'VAE': autoencoder_color,
     'TimeGAN LSTM': timegan_color,
     'TimeGAN GRU': timegan_color,
 }
@@ -96,7 +96,7 @@ def get_tsne_results(real, syn, no_samples):
     data_final = np.concatenate((real, syn), axis = 0)
     
     # TSNE anlaysis
-    tsne = TSNE(n_components = 2, verbose = 1, perplexity = 40, n_iter = 300)
+    tsne = TSNE(n_components = 2, verbose = 1, perplexity = 40, n_iter = 300, random_state=69)
     tsne_results = tsne.fit_transform(data_final) # shape: (2*no_samples, 2)
 
     return tsne_results

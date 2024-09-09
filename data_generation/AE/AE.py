@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -47,34 +46,6 @@ class LSTMAE(nn.Module):
         x = self.decoder(x)
         x = x.view(-1, 12, 5)
         return x
-
-
-class FCAE(nn.Module):
-    def __init__(self, verbose=False):
-        super().__init__()
-        self.verbose = verbose
-        # N, 12, 5
-        
-        self.encoder = nn.Sequential(
-            nn.Linear(12*5, 48),
-            nn.ReLU(),
-            nn.Linear(48, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 8),
-            nn.ReLU()
-        )
-
-        
-    
-    def forward(self, x):
-        x = x.flatten(start_dim=1)
-        x = self.encoder(x)
-        x = self.decoder(x)
-        x = x.view(-1, 12, 5)
-        return x
-    
 
 def train_autoencoder(model, 
               hyperparameters, 
