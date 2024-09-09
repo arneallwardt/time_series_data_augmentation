@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy as dc
 
-def create_jittered_time_series(data: pd.DataFrame, jitter_factor: float, no_features) -> np.ndarray:
+def create_jittered_time_series(data: pd.DataFrame, jitter_factor: float, no_features, save_data=True) -> np.ndarray:
     """Create a jittered time series by adding random noise to the original time series.
     The jittering only affects continuous features and leaves categorical features as is.
     Jittered values below 0 are set to 0.
@@ -36,4 +36,7 @@ def create_jittered_time_series(data: pd.DataFrame, jitter_factor: float, no_fea
 
     noisy_data_df = pd.DataFrame(noisy_data, columns=columns)
 
-    noisy_data_df.to_csv(f'jittered_data_{str(jitter_factor).replace(".", "")}.csv', index=False)
+    if save_data:
+        noisy_data_df.to_csv(f'jittered_data_{str(jitter_factor).replace(".", "")}.csv', index=False)
+    else:
+        return noisy_data_df

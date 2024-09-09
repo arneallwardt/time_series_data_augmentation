@@ -1,0 +1,15 @@
+ipykernel==6.29.4
+Markdown==3.6
+matplotlib==3.8.4
+numpy==1.26.4
+pandas==2.2.2
+pathlib==1.0.1
+pillow==10.3.0
+python-dotenv==1.0.1
+scikit-learn==1.5.0
+scipy==1.13.0
+seaborn==0.13.2
+torch==2.3.0
+tqdm==4.66.4
+tsaug==0.2.1
+xgboost==2.1.0
