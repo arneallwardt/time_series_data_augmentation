@@ -3,7 +3,7 @@ This repository contains Code for my bachelors thesis "**Untersuchung und Vergle
 
 ## Existing Implementations
 Already existing implementations of the following models were used and evaluated:
-- [TimeGAN](https://github.com/jsyoon0823/TimeGAN)
+- [TimeGAN](https://github.com/jsyoon0823/TimeGAN) ([Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0))
 
 ## Dataset
 [Metro Interstate Traffic Volume](https://archive.ics.uci.edu/dataset/492/metro+interstate+traffic+volume)
