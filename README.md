@@ -22,7 +22,7 @@ You'll first need to install the required dependencies by executing `pip install
 This repository contains 3 important directories: [data](./data/), [data_evaluation](./data_evaluation/) and [data_generation](./data_generation/) which you can use to do the following
 - plot results for discriminative- (**Ähnlichkeit**), visual- (**Diversität**), predictive evaluation (**Nützlichkeit**) aswell as the field test (**Praxistest**)
 - train new AE, VAE and TimeGAN models
-- test existing AE and VAE models 
+- generate new data using Jittering, Time Warping, AE, VAE, and TimeGAN
 - look at real and synthetic data
 
 ## data_evaluation
@@ -44,11 +44,11 @@ Here you can use the data augmentation methods discussed in the thesis to genera
 
 ### Autoencoder
 - [AE Architecture](./data_generation/AE/AE.py), [AE Training](./data_generation/AE/AE_training.ipynb)
-- You can train a new AE or test the saved model by setting `TEST_EXISTING_MODEL=True`
+- You can train a new AE or test the saved model by setting `TEST_SAVED_MODEL=True`
 
 ### Variational Autoencoder
 - [VAE Architecture](./data_generation/VAE/VAE.py), [VAE Training](./data_generation/VAE/VAE_training.ipynb)
-- You can train a new VAE or test the saved model by setting `TEST_EXISTING_MODEL=True`
+- You can train a new VAE or test the saved model by setting `TEST_SAVED_MODEL=True`
 
 ### TimeGAN
 - [TimeGAN Architecture](./data_generation/GANs/TimeGAN/timegan.py), [TimeGAN Training](./data_generation/GANs/TimeGAN/tutorial_timegan.ipynb)
