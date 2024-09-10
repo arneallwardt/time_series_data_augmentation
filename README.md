@@ -31,7 +31,7 @@ Here you can plot results for the discriminative- (**Ähnlichkeit**), visual- (*
 The architectures aswell as training files for the discriminative model (**Ähnlichkeit**) and predictive model (**Nützlichkeit**) are also provided:
 - [Discriminative model training](./data_evaluation/discriminative/discriminative_model_training.ipynb)
 - [Discriminative model architecture](./data_evaluation/discriminative/discriminative_model.py)
-- [Predictive model training](./data_evaluation/predictive/predictive_model_training.ipynb) (Saves results aswell. You can change the synthetic data by changing `syn_data_type`)
+- [Predictive model training](./data_evaluation/predictive/predictive_model_training.ipynb) (Saves results aswell. You can change the type of synthetic data used for the evaluation by changing `syn_data_type`)
 - [Predictive model architecture](./data_evaluation/predictive/LSTM.py) 
 
 ## data_generation
