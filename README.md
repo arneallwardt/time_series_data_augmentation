@@ -17,9 +17,9 @@ The architecture of the Variational Autoencoder is based on this example from Py
 All results are based on this dataset: [Metro Interstate Traffic Volume](https://archive.ics.uci.edu/dataset/492/metro+interstate+traffic+volume)
 
 # How to use
-You'll first need to install the required dependencies by executing `pip install -r requirements.txt` inside the root directory
+You'll first need to install the required dependencies by executing `pip install -r requirements.txt` inside the root directory.
 
-This repository contains 3 important directories: [data](./data/), [data_evaluation](./data_evaluation/) and [data_generation](./data_generation/) which you can use to do the following
+This repository contains 3 important directories: [data](./data/), [data_evaluation](./data_evaluation/) and [data_generation](./data_generation/) which you can use to do the following:
 - plot results for discriminative- (**Ähnlichkeit**), visual- (**Diversität**), predictive evaluation (**Nützlichkeit**) aswell as the field test (**Praxistest**)
 - train new AE, VAE and TimeGAN models
 - generate new data using Jittering, Time Warping, AE, VAE, and TimeGAN
