@@ -43,12 +43,12 @@ Here you can use the data augmentation methods discussed in the thesis to genera
 - [Applying random transformations to original data](./data_generation/random_transformations/apply_random_transformations.ipynb)
 
 ### Autoencoder
-- [AE Architecture](./data_generation/AE/AE.py), [AE Training](./data_generation/AE/AE_training.ipynb)
-- You can train a new AE or test the saved model by setting `TEST_SAVED_MODEL=True`
+- [AE Architecture](./data_generation/AE/AE.py)
+- [AE Training](./data_generation/AE/AE_training.ipynb) (You can train a new AE or test the saved model by setting `TEST_SAVED_MODEL=True`)
 
 ### Variational Autoencoder
-- [VAE Architecture](./data_generation/VAE/VAE.py), [VAE Training](./data_generation/VAE/VAE_training.ipynb)
-- You can train a new VAE or test the saved model by setting `TEST_SAVED_MODEL=True`
+- [VAE Architecture](./data_generation/VAE/VAE.py)
+- [VAE Training](./data_generation/VAE/VAE_training.ipynb) (You can train a new VAE or test the saved model by setting `TEST_SAVED_MODEL=True`)
 
 ### TimeGAN
 - [TimeGAN Architecture](./data_generation/GANs/TimeGAN/timegan.py), [TimeGAN Training](./data_generation/GANs/TimeGAN/tutorial_timegan.ipynb)
