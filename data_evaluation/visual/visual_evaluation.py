@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-original_color = os.getenv('GRAY', 'red')
+original_color = os.getenv('GRAY', 'black')
 autoencoder_color = os.getenv('BLUE', 'blue')
 timegan_color = os.getenv('GREEN', 'green')
 random_transformation_color = os.getenv('RED', 'red')
